@@ -30,11 +30,11 @@ func main() {
 			ctx.EnableBlend()                    // 扉画像のような透過テクスチャを正しく合成するため
 			ctx.ClearColor(0.53, 0.75, 0.9, 1.0) // 空っぽい水色
 
-			scene, doorIndex, err := renderer.BuildFieldDemoScene(ctx)
+			scene, linkIndex, doorIndex, err := renderer.BuildFieldDemoScene(ctx)
 			if err != nil {
 				fmt.Println("renderer: failed to build demo scene:", err)
 			} else {
-				g := game.New(scene, doorIndex)
+				g := game.New(scene, linkIndex, doorIndex)
 				game.SetInstance(g)
 
 				ctx.RunLoop(func(dt float64) {

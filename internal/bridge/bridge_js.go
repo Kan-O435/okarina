@@ -17,7 +17,9 @@ func Init() {
 	js.Global().Set("goPing", js.FuncOf(goPing))
 	js.Global().Set("goOnMIDIEvent", js.FuncOf(goOnMIDIEvent))
 	js.Global().Set("goOpenDoor", js.FuncOf(goOpenDoor))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor)")
+	js.Global().Set("goOnPitchDetected", js.FuncOf(goOnPitchDetected))
+	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection)")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
@@ -47,6 +49,7 @@ func goOnMIDIEvent(this js.Value, args []js.Value) interface{} {
 		Timestamp: args[3].Float(),
 	}
 	midi.HandleEvent(event)
+	game.OnMIDIEvent(event)
 	CallConsoleLog(fmt.Sprintf("bridge: MIDI event forwarded to Go: %+v", event))
 	return nil
 }
@@ -58,4 +61,24 @@ func goOpenDoor(this js.Value, args []js.Value) interface{} {
 	game.OpenDoor()
 	CallConsoleLog("bridge: goOpenDoor() called, opening secret door")
 	return nil
+}
+
+// goOnPitchDetected はJavaScript(マイク入力のピッチ検出)側から、検出した
+// 周波数(Hz)を渡すためのエントリーポイント。音量不足などでピッチが
+// 検出できなかった場合は0以下を渡す。実際のプレイヤー移動は、Go側で
+// 常時回っているゲームループ(Context.RunLoop、cmd/game/main.go参照)が
+// 毎フレームplayer.Playerの状態を読んで進める。
+func goOnPitchDetected(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		CallConsoleLog("bridge: goOnPitchDetected expects 1 arg (frequencyHz)")
+		return nil
+	}
+	game.OnPitchDetected(args[0].Float())
+	return nil
+}
+
+// goGetPlayerDirection はプレイヤーの現在の移動方向をJS側に返す
+// ("forward" | "backward" | "idle")。UI表示等に使う。
+func goGetPlayerDirection(this js.Value, args []js.Value) interface{} {
+	return game.PlayerDirection()
 }

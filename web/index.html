@@ -20,7 +20,29 @@
 <h3>MIDI入力</h3>
 <div id="midi-status"></div>
 
+<h3>オカリナの音</h3>
+<div id="audio-controls">
+  <button id="btn-enable-audio">音を有効にする(初回にクリック)</button>
+  <button id="btn-test-sound">テスト再生</button>
+</div>
+
+<h3>オタマトーンでLinkを移動</h3>
+<div id="mic-pitch-status">マイクは未接続です</div>
+<button id="btn-start-mic-pitch">マイクを開始</button>
+<div id="mic-pitch-info">
+  <span id="mic-pitch-value">-- Hz</span>
+  <span id="mic-direction">停止</span>
+</div>
+<div id="mic-threshold-row">
+  <label for="mic-threshold-slider">しきい値</label>
+  <input type="range" id="mic-threshold-slider" min="-60" max="-10" value="-30" step="1">
+  <span id="mic-threshold-value">-30 dB</span>
+</div>
+
 <script src="wasm_exec.js"></script>
+<script src="audio.js"></script>
+<script src="pitch.js"></script>
+<script src="mic-pitch.js"></script>
 <script src="main.js"></script>
 
 </body>

@@ -3,10 +3,21 @@ package game
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/Kan-O435/okarina/internal/midi"
+	"github.com/Kan-O435/okarina/internal/music"
+	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
+	"github.com/Kan-O435/okarina/internal/vecmath"
 	"github.com/Kan-O435/okarina/internal/world"
 )
+
+// melodyIdleTimeout は、この時間MIDI入力がなければ1回の演奏が
+// 終わったとみなす無音時間。
+const melodyIdleTimeout = 2 * time.Second
+
+var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
 // Run はゲームのエントリーポイント。
 // 現時点ではプロジェクトの雛形確認用の最小実装。
@@ -14,18 +25,19 @@ func Run() {
 	fmt.Println("game.Run() called")
 }
 
-// Game は、Sceneと(現時点では)隠し扉の状態をまとめて保持し、毎フレームの
-// 更新(Update)をSceneのTransformへ反映する。
+// Game は、Sceneと、毎フレーム更新が必要な状態(プレイヤー=Linkの位置・
+// 隠し扉の開閉)をまとめて保持し、Update()でSceneのTransformへ反映する。
 type Game struct {
 	scene     *renderer.Scene
+	linkIndex int
 	doorIndex int
 	door      world.Door
 }
 
-// New はSceneと、扉Objectのインデックス(BuildFieldDemoSceneが返す)から
-// Gameを組み立てる。
-func New(scene *renderer.Scene, doorIndex int) *Game {
-	return &Game{scene: scene, doorIndex: doorIndex}
+// New はSceneと、Link/扉Objectのインデックス(BuildFieldDemoSceneが返す)
+// からGameを組み立てる。
+func New(scene *renderer.Scene, linkIndex, doorIndex int) *Game {
+	return &Game{scene: scene, linkIndex: linkIndex, doorIndex: doorIndex}
 }
 
 // OpenDoor は隠し扉を開き始める。何らかの「特定の動作」(将来的にはMIDIの
@@ -34,11 +46,17 @@ func (g *Game) OpenDoor() {
 	g.door.Open()
 }
 
-// Update はdeltaTime(秒)だけゲーム状態を進め、扉Objectの見た目(Transform)
-// に反映する。
+// Update はdeltaTime(秒)だけゲーム状態を進め、扉・プレイヤー(Link)の
+// 見た目(Transform)に反映する。
 func (g *Game) Update(dt float64) {
 	g.door.Update(dt)
 	g.scene.Objects[g.doorIndex].Transform = renderer.DoorTransform(g.door.Progress)
+
+	deltaZ := player.Player.Update(dt)
+	if deltaZ != 0 && g.linkIndex >= 0 {
+		move := vecmath.Translate(vecmath.NewVec3(0, 0, deltaZ))
+		g.scene.Objects[g.linkIndex].Transform = move.Mul(g.scene.Objects[g.linkIndex].Transform)
+	}
 }
 
 // instance は、ブラウザ側(bridge)からの呼び出しを受けるための
@@ -55,5 +73,35 @@ func SetInstance(g *Game) {
 func OpenDoor() {
 	if instance != nil {
 		instance.OpenDoor()
+	}
+}
+
+// OnPitchDetected はマイクから検出された最新のピッチ(Hz)をプレイヤーの
+// 移動方向判定に渡す。ピッチが検出できなかった場合はfreqに0以下を渡す。
+func OnPitchDetected(freq float64) {
+	player.Player.OnPitch(freq)
+}
+
+// PlayerDirection は現在のプレイヤーの移動方向を文字列で返す
+// ("forward" | "backward" | "idle")。UI表示など、JS側からの参照用。
+func PlayerDirection() string {
+	return player.Player.Direction.String()
+}
+
+// OnMIDIEvent はJS-Go Bridge経由で受け取ったMIDIイベントを
+// 旋律記録エンジン(internal/music.Recorder)に渡す。
+func OnMIDIEvent(e midi.Event) {
+	recorder.HandleEvent(e)
+}
+
+// onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
+// 登録済みの旋律パターンと照合する。
+func onMelodyRecorded(melody music.Melody) {
+	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
+
+	if name := music.Recognize(melody, music.DefaultPatterns); name != "" {
+		fmt.Printf("[music] recognized: %s\n", name)
+	} else {
+		fmt.Println("[music] recognized: (no match)")
 	}
 }

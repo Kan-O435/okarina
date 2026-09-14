@@ -60,12 +60,13 @@ var doorOpenAngleRad = vecmath.Radians(100)
 
 // BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール・階段+
 // 建物/塔/扉のプレースホルダー)を配置したSceneを組み立てる。
-// 戻り値の2番目は、Scene.Objects内での扉Objectのインデックス
-// (呼び出し側が毎フレーム扉のTransformを更新できるようにするため)。
-func BuildFieldDemoScene(c *Context) (*Scene, int, error) {
+// 戻り値のlinkIndexはLinkに対応するObjectのインデックス(プレイヤー移動に
+// 合わせて呼び出し側がTransformを書き換えるために使う)、doorIndexは扉
+// Objectのインデックス(毎フレーム扉のTransformを更新するために使う)。
+func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int, err error) {
 	program, err := c.NewProgram(basicVertexShaderSrc, basicFragmentShaderSrc)
 	if err != nil {
-		return nil, 0, err
+		return nil, -1, -1, err
 	}
 
 	width, height := c.CanvasSize()
@@ -87,19 +88,20 @@ func BuildFieldDemoScene(c *Context) (*Scene, int, error) {
 
 	templeBody, err := templeBodyObject(c)
 	if err != nil {
-		return nil, 0, err
+		return nil, -1, -1, err
 	}
 	objects = append(objects, templeBody)
 
 	link, err := linkObject(c)
 	if err != nil {
-		return nil, 0, err
+		return nil, -1, -1, err
 	}
 	objects = append(objects, link)
+	linkIndex = len(objects) - 1
 
 	trees, err := treeObjects(c)
 	if err != nil {
-		return nil, 0, err
+		return nil, -1, -1, err
 	}
 	objects = append(objects, trees...)
 
@@ -107,10 +109,10 @@ func BuildFieldDemoScene(c *Context) (*Scene, int, error) {
 	// オブジェクトがすでに描画された後(=Objectsの最後)に描画する。先に描くと、
 	// 扉の透過部分が「まだ何も描かれていない背景色」と合成され、後から描かれる
 	// 建物にその部分だけ穴が空いたように見えてしまう。
-	doorIndex := len(objects)
+	doorIndex = len(objects)
 	door, err := doorObject(c)
 	if err != nil {
-		return nil, 0, err
+		return nil, -1, -1, err
 	}
 	objects = append(objects, door)
 
@@ -118,7 +120,7 @@ func BuildFieldDemoScene(c *Context) (*Scene, int, error) {
 		Program:        program,
 		ViewProjection: projection.Mul(view),
 		Objects:        objects,
-	}, doorIndex, nil
+	}, linkIndex, doorIndex, nil
 }
 
 func groundObject(c *Context) Object {

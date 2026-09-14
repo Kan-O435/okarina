@@ -4,6 +4,8 @@ const midiStatusEl = document.getElementById('midi-status');
 const btnPing = document.getElementById('btn-ping');
 const btnMidi = document.getElementById('btn-midi');
 const btnOpenDoor = document.getElementById('btn-open-door');
+const btnEnableAudio = document.getElementById('btn-enable-audio');
+const btnTestSound = document.getElementById('btn-test-sound');
 
 function appendLog(text) {
   const line = document.createElement('div');
@@ -62,6 +64,12 @@ function onMIDIMessage(event) {
 
   appendMidiStatus((isNoteOn ? "Note ON  " : "Note OFF ") + "note=" + note + " velocity=" + velocity);
 
+  if (isNoteOn) {
+    playNote(note, velocity);
+  } else {
+    stopNote(note);
+  }
+
   if (window.goOnMIDIEvent) {
     window.goOnMIDIEvent(note, velocity, isNoteOn, event.timeStamp);
   }
@@ -94,6 +102,17 @@ if (!WebAssembly) {
       btnOpenDoor.addEventListener('click', () => {
         window.goOpenDoor();
         appendLog("JS → Go: goOpenDoor() を呼びました。隠し扉が開くはずです。");
+      });
+
+      btnEnableAudio.addEventListener('click', () => {
+        ensureAudioContext();
+        appendLog("オーディオを有効化しました");
+      });
+
+      btnTestSound.addEventListener('click', () => {
+        playNote(60, 100);
+        setTimeout(() => stopNote(60), 500);
+        appendLog("テスト再生: note=60 を0.5秒鳴らしました");
       });
 
       initMIDI();
