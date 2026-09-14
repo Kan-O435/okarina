@@ -70,14 +70,14 @@ func TestUpdate_FacesMovementDirection(t *testing.T) {
 	s.OnPitch(300)
 	s.OnPitch(400) // Forward
 	s.Update(0.1)
-	if s.Yaw != 0 {
-		t.Fatalf("expected Yaw=0 while moving forward, got %v", s.Yaw)
+	if s.Yaw != math.Pi {
+		t.Fatalf("expected Yaw=Pi while moving forward, got %v", s.Yaw)
 	}
 
 	s.OnPitch(300) // Backward
 	s.Update(0.1)
-	if s.Yaw != math.Pi {
-		t.Fatalf("expected Yaw=Pi while moving backward, got %v", s.Yaw)
+	if s.Yaw != 0 {
+		t.Fatalf("expected Yaw=0 while moving backward, got %v", s.Yaw)
 	}
 
 	// Idleになっても、直前に向いていた方向を保つ(不自然に正面へ戻さない)。
@@ -86,7 +86,7 @@ func TestUpdate_FacesMovementDirection(t *testing.T) {
 	if s.Direction != Idle {
 		t.Fatalf("expected Idle, got %v", s.Direction)
 	}
-	if s.Yaw != math.Pi {
-		t.Fatalf("expected Yaw to stay at Pi while Idle, got %v", s.Yaw)
+	if s.Yaw != 0 {
+		t.Fatalf("expected Yaw to stay at 0 while Idle, got %v", s.Yaw)
 	}
 }

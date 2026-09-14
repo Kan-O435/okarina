@@ -93,10 +93,10 @@ func (s *State) Update(dt float64) float64 {
 	var deltaZ float64
 	switch s.Direction {
 	case Forward:
-		s.Yaw = 0
+		s.Yaw = math.Pi
 		deltaZ = -moveSpeed * dt
 	case Backward:
-		s.Yaw = math.Pi
+		s.Yaw = 0
 		deltaZ = moveSpeed * dt
 	default:
 		return 0
