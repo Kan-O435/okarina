@@ -29,6 +29,27 @@ func (c *Context) LoadSkinnedGLBMesh(data []byte) (*Model, error) {
 	return c.buildModel(prim)
 }
 
+// LoadGLBParts はLoadGLBMeshと同様だが、Tripo3Dのセグメンテーション機能で
+// パーツ分割されたGLB向けに、全メッシュをそれぞれ独立したModelとして返す。
+// パーツごとに別マテリアル(別テクスチャ)を持つため、LoadSkinnedGLBMeshの
+// ように1つのModelへ結合できず、呼び出し側でパーツごとに別Objectとして
+// 描画する必要がある。
+func (c *Context) LoadGLBParts(data []byte) ([]*Model, error) {
+	prims, err := gltf.ParseParts(data)
+	if err != nil {
+		return nil, err
+	}
+	models := make([]*Model, 0, len(prims))
+	for i := range prims {
+		model, err := c.buildModel(&prims[i])
+		if err != nil {
+			return nil, err
+		}
+		models = append(models, model)
+	}
+	return models, nil
+}
+
 // buildModel はgltf.Primitiveから実際にGPUリソース(Mesh・Texture)を作り、
 // Modelにまとめる。baseColorTexture画像が無い場合は共有の白テクスチャを使う
 // (Model.Colorだけで色が決まる)。
