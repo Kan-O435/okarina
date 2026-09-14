@@ -41,8 +41,10 @@ GOOS=js GOARCH=wasm go build -o web/game.wasm ./cmd/game
 
 ### 2. wasm_exec.js の配置(Goのバージョンを上げた時などは再実行)
 
+Go 1.24以降は配置場所が `lib/wasm/` に変わっている(それ以前は `misc/wasm/`)。
+
 ```bash
-cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/wasm_exec.js
+cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js
 ```
 
 ### 3. ローカルサーバーで配信
@@ -66,10 +68,20 @@ game.Run() called
 
 が表示されればOK。
 
+### 5. JS-Go Bridgeの確認
+
+画面上のボタンを操作すると、JavaScript ⇔ Go WASM の相互呼び出しを確認できる。
+
+- 「JS→Go: goPing() を呼ぶ」: JSからGoの関数を呼び出し、戻り値を受け取る
+- 「JS→Go: MIDIイベントを送る(テスト)」: MIDIイベント相当のデータ(note, velocity, isNoteOn, timestamp)をGoへ渡す
+
+いずれもConsoleと画面下部のログにメッセージが表示されればOK。
+
 ## 今後の予定
 
-- [x] #1: Goプロジェクトを作成する
-- [x] #2: GoをWASMとして実行できるようにする
-- [ ] #4: MIDIデバイスを検出する
-- [ ] #5: MIDI Note ON/OFFを取得する
-- [ ] #6: MIDIイベントをGoへ渡す
+- [x] Goプロジェクトを作成する
+- [x] GoをWASMとして実行できるようにする
+- [x] GoとJavaScript間のBridgeを作成する
+- [ ] MIDIデバイスを検出する
+- [ ] MIDI Note ON/OFFを取得する
+- [ ] MIDIイベントをGoへ渡す(Web MIDI APIとの結合)

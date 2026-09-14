@@ -10,9 +10,24 @@
 <div id="status">Go WASM を読み込み中...</div>
 <canvas id="game-canvas" width="800" height="600"></canvas>
 
+<div id="bridge-controls">
+  <button id="btn-ping" disabled>JS→Go: goPing() を呼ぶ</button>
+  <button id="btn-midi" disabled>JS→Go: MIDIイベントを送る(テスト)</button>
+</div>
+<div id="bridge-log"></div>
+
 <script src="wasm_exec.js"></script>
 <script>
   const statusEl = document.getElementById('status');
+  const bridgeLogEl = document.getElementById('bridge-log');
+  const btnPing = document.getElementById('btn-ping');
+  const btnMidi = document.getElementById('btn-midi');
+
+  function appendLog(text) {
+    const line = document.createElement('div');
+    line.textContent = text;
+    bridgeLogEl.appendChild(line);
+  }
 
   if (!WebAssembly) {
     statusEl.textContent = "このブラウザはWebAssemblyに対応していません";
@@ -23,6 +38,19 @@
       .then((result) => {
         statusEl.textContent = "Go WASM 起動完了 (Consoleを確認してください)";
         go.run(result.instance);
+
+        btnPing.disabled = false;
+        btnMidi.disabled = false;
+
+        btnPing.addEventListener('click', () => {
+          const reply = window.goPing();
+          appendLog("JS → Go → 戻り値: " + reply);
+        });
+
+        btnMidi.addEventListener('click', () => {
+          window.goOnMIDIEvent(60, 100, true, performance.now());
+          appendLog("JS → Go: MIDIイベント(note=60, velocity=100, on=true)を送信しました。Consoleも確認してください。");
+        });
       })
       .catch((err) => {
         statusEl.textContent = "WASMのロードに失敗しました: " + err;
