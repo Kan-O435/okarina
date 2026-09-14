@@ -18,16 +18,16 @@ func quadIndices() []uint16 {
 }
 
 // quadUVsCropped は、quadVertices/verticalQuadVerticesの4頂点
-// (左下・右下・右上・左上の順)に対応するUV座標を、テクスチャの横方向(U)
-// だけ[u0, u1]の範囲に絞って返す(縦方向Vは0〜1のまま)。画像をそのまま
-// 貼りたい場合はquadUVsCropped(0, 1)を使う。画像の左右に使いたくない部分
-// (枠など)がある場合は、そこを除いた中央部分だけを表示できる。
-func quadUVsCropped(u0, u1 float32) []float32 {
+// (左下・右下・右上・左上の順)に対応するUV座標を、[u0, u1]×[v0, v1]の
+// 範囲に絞って返す。画像をそのまま貼りたい場合はquadUVsCropped(0, 0, 1, 1)を
+// 使う。画像の外枠(石枠・余白の透過部分など)を除いて、中央の必要な部分
+// だけを表示したい場合に使う。
+func quadUVsCropped(u0, v0, u1, v1 float32) []float32 {
 	return []float32{
-		u0, 0,
-		u1, 0,
-		u1, 1,
-		u0, 1,
+		u0, v0,
+		u1, v0,
+		u1, v1,
+		u0, v1,
 	}
 }
 
