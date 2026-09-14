@@ -10,6 +10,7 @@ import (
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
 	"github.com/Kan-O435/okarina/internal/vecmath"
+	"github.com/Kan-O435/okarina/internal/world"
 )
 
 // melodyIdleTimeout は、この時間MIDI入力がなければ1回の演奏が
@@ -18,44 +19,61 @@ const melodyIdleTimeout = 2 * time.Second
 
 var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
-// ctx・scene・linkIndexは、InitRenderer()で描画準備が完了した後、
-// UpdateFrame()から毎フレームLinkの位置を書き換えて再描画するために保持する。
-var (
-	ctx       *renderer.Context
-	scene     *renderer.Scene
-	linkIndex = -1
-)
-
 // Run はゲームのエントリーポイント。
 // 現時点ではプロジェクトの雛形確認用の最小実装。
 func Run() {
 	fmt.Println("game.Run() called")
 }
 
-// InitRenderer はWebGLコンテキストを初期化し、フィールドのデモシーンを
-// 構築して最初の描画を行う。以後はUpdateFrame()がプレイヤーの移動に
-// 合わせて再描画する。
-func InitRenderer(canvasID string) error {
-	c, err := renderer.NewContext(canvasID)
-	if err != nil {
-		return fmt.Errorf("renderer context init failed: %w", err)
+// Game は、Sceneと、毎フレーム更新が必要な状態(プレイヤー=Linkの位置・
+// 隠し扉の開閉)をまとめて保持し、Update()でSceneのTransformへ反映する。
+type Game struct {
+	scene     *renderer.Scene
+	linkIndex int
+	doorIndex int
+	door      world.Door
+}
+
+// New はSceneと、Link/扉Objectのインデックス(BuildFieldDemoSceneが返す)
+// からGameを組み立てる。
+func New(scene *renderer.Scene, linkIndex, doorIndex int) *Game {
+	return &Game{scene: scene, linkIndex: linkIndex, doorIndex: doorIndex}
+}
+
+// OpenDoor は隠し扉を開き始める。何らかの「特定の動作」(将来的にはMIDIの
+// メロディ認識、今は動作確認用のボタン)から呼ばれる想定。
+func (g *Game) OpenDoor() {
+	g.door.Open()
+}
+
+// Update はdeltaTime(秒)だけゲーム状態を進め、扉・プレイヤー(Link)の
+// 見た目(Transform)に反映する。
+func (g *Game) Update(dt float64) {
+	g.door.Update(dt)
+	g.scene.Objects[g.doorIndex].Transform = renderer.DoorTransform(g.door.Progress)
+
+	deltaZ := player.Player.Update(dt)
+	if deltaZ != 0 && g.linkIndex >= 0 {
+		move := vecmath.Translate(vecmath.NewVec3(0, 0, deltaZ))
+		g.scene.Objects[g.linkIndex].Transform = move.Mul(g.scene.Objects[g.linkIndex].Transform)
 	}
+}
 
-	width, height := c.CanvasSize()
-	c.Viewport(width, height)
-	c.EnableDepthTest()
-	c.ClearColor(0.53, 0.75, 0.9, 1.0) // 空っぽい水色
+// instance は、ブラウザ側(bridge)からの呼び出しを受けるための
+// パッケージレベルのシングルトン。
+var instance *Game
 
-	s, li, err := renderer.BuildFieldDemoScene(c)
-	if err != nil {
-		return fmt.Errorf("failed to build demo scene: %w", err)
+// SetInstance はブリッジ経由の呼び出し先となるGameインスタンスを登録する。
+func SetInstance(g *Game) {
+	instance = g
+}
+
+// OpenDoor はブリッジ(JavaScript側)から呼ばれ、登録済みのGameインスタンスの
+// 扉を開く。インスタンスが未登録の場合は何もしない。
+func OpenDoor() {
+	if instance != nil {
+		instance.OpenDoor()
 	}
-
-	ctx = c
-	scene = s
-	linkIndex = li
-	scene.Render(ctx)
-	return nil
 }
 
 // OnPitchDetected はマイクから検出された最新のピッチ(Hz)をプレイヤーの
@@ -68,24 +86,6 @@ func OnPitchDetected(freq float64) {
 // ("forward" | "backward" | "idle")。UI表示など、JS側からの参照用。
 func PlayerDirection() string {
 	return player.Player.Direction.String()
-}
-
-// UpdateFrame は毎フレーム呼び出され、プレイヤーを現在の移動方向に
-// 応じて進め、Linkの位置を更新して再描画する。dtは前フレームからの
-// 経過時間(秒)。
-func UpdateFrame(dt float64) {
-	if scene == nil || linkIndex < 0 {
-		return
-	}
-
-	deltaZ := player.Player.Update(dt)
-	if deltaZ == 0 {
-		return
-	}
-
-	move := vecmath.Translate(vecmath.NewVec3(0, 0, deltaZ))
-	scene.Objects[linkIndex].Transform = move.Mul(scene.Objects[linkIndex].Transform)
-	scene.Render(ctx)
 }
 
 // OnMIDIEvent はJS-Go Bridge経由で受け取ったMIDIイベントを

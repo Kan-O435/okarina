@@ -16,10 +16,10 @@ import (
 func Init() {
 	js.Global().Set("goPing", js.FuncOf(goPing))
 	js.Global().Set("goOnMIDIEvent", js.FuncOf(goOnMIDIEvent))
+	js.Global().Set("goOpenDoor", js.FuncOf(goOpenDoor))
 	js.Global().Set("goOnPitchDetected", js.FuncOf(goOnPitchDetected))
-	js.Global().Set("goUpdateFrame", js.FuncOf(goUpdateFrame))
 	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOnPitchDetected, goUpdateFrame, goGetPlayerDirection)")
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection)")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
@@ -54,27 +54,26 @@ func goOnMIDIEvent(this js.Value, args []js.Value) interface{} {
 	return nil
 }
 
+// goOpenDoor はJavaScript側から呼び出され、隠し扉を開く。
+// 現時点では動作確認用のボタンから直接呼ぶ想定。将来的にはMIDIのメロディ
+// 認識が成功した際にGo側(game.OpenDoor())から呼ばれる形に置き換える。
+func goOpenDoor(this js.Value, args []js.Value) interface{} {
+	game.OpenDoor()
+	CallConsoleLog("bridge: goOpenDoor() called, opening secret door")
+	return nil
+}
+
 // goOnPitchDetected はJavaScript(マイク入力のピッチ検出)側から、検出した
 // 周波数(Hz)を渡すためのエントリーポイント。音量不足などでピッチが
-// 検出できなかった場合は0以下を渡す。
+// 検出できなかった場合は0以下を渡す。実際のプレイヤー移動は、Go側で
+// 常時回っているゲームループ(Context.RunLoop、cmd/game/main.go参照)が
+// 毎フレームplayer.Playerの状態を読んで進める。
 func goOnPitchDetected(this js.Value, args []js.Value) interface{} {
 	if len(args) < 1 {
 		CallConsoleLog("bridge: goOnPitchDetected expects 1 arg (frequencyHz)")
 		return nil
 	}
 	game.OnPitchDetected(args[0].Float())
-	return nil
-}
-
-// goUpdateFrame はJavaScript側のrequestAnimationFrameループから毎フレーム
-// 呼び出され、プレイヤーの移動と再描画を進める。引数は前フレームからの
-// 経過時間(秒)。
-func goUpdateFrame(this js.Value, args []js.Value) interface{} {
-	if len(args) < 1 {
-		CallConsoleLog("bridge: goUpdateFrame expects 1 arg (deltaTimeSeconds)")
-		return nil
-	}
-	game.UpdateFrame(args[0].Float())
 	return nil
 }
 

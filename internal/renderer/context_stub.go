@@ -22,8 +22,15 @@ func (c *Context) Clear() {}
 // EnableDepthTest はネイティブビルドでは何もしない。
 func (c *Context) EnableDepthTest() {}
 
+// EnableBlend はネイティブビルドでは何もしない。
+func (c *Context) EnableBlend() {}
+
 // Viewport はネイティブビルドでは何もしない。
 func (c *Context) Viewport(width, height int) {}
 
 // CanvasSize はネイティブビルドでは常に0を返す。
 func (c *Context) CanvasSize() (int, int) { return 0, 0 }
+
+// RunLoop はネイティブビルドでは何もしない
+// (requestAnimationFrameはブラウザ環境でのみ利用できるため)。
+func (c *Context) RunLoop(callback func(dt float64)) {}

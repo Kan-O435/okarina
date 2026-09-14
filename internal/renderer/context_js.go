@@ -10,9 +10,12 @@ import (
 // syscall/js経由ではgl定数(gl.COLOR_BUFFER_BIT等)を直接参照できないため、
 // 使用する定数はここで値を定義しておく。
 const (
-	glColorBufferBit = 0x00004000
-	glDepthBufferBit = 0x00000100
-	glDepthTest      = 0x0B71
+	glColorBufferBit   = 0x00004000
+	glDepthBufferBit   = 0x00000100
+	glDepthTest        = 0x0B71
+	glBlend            = 0x0BE2
+	glSrcAlpha         = 0x0302
+	glOneMinusSrcAlpha = 0x0303
 )
 
 // Context は取得済みのWebGL1レンダリングコンテキストをラップする。
@@ -55,6 +58,13 @@ func (c *Context) EnableDepthTest() {
 	c.gl.Call("enable", glDepthTest)
 }
 
+// EnableBlend はアルファブレンディングを有効にする。
+// 扉画像のような、背景が透過(アルファ<1)なテクスチャを正しく合成するために使う。
+func (c *Context) EnableBlend() {
+	c.gl.Call("enable", glBlend)
+	c.gl.Call("blendFunc", glSrcAlpha, glOneMinusSrcAlpha)
+}
+
 // Viewport はWebGLの描画範囲を設定する。canvasのサイズと合わせて呼ぶ。
 func (c *Context) Viewport(width, height int) {
 	c.gl.Call("viewport", 0, 0, width, height)
@@ -63,6 +73,27 @@ func (c *Context) Viewport(width, height int) {
 // CanvasSize はcanvas要素の描画サイズ(width, height)を返す。
 func (c *Context) CanvasSize() (int, int) {
 	return c.canvas.Get("width").Int(), c.canvas.Get("height").Int()
+}
+
+// RunLoop はrequestAnimationFrameを使い、毎フレームcallbackを呼び出し続ける。
+// callbackには前フレームからの経過時間(秒、dt)が渡される(1フレーム目は0)。
+func (c *Context) RunLoop(callback func(dt float64)) {
+	var frame js.Func
+	lastTime := 0.0
+	frame = js.FuncOf(func(this js.Value, args []js.Value) interface{} {
+		now := args[0].Float()
+		dt := 0.0
+		if lastTime > 0 {
+			dt = (now - lastTime) / 1000
+		}
+		lastTime = now
+
+		callback(dt)
+
+		js.Global().Call("requestAnimationFrame", frame)
+		return nil
+	})
+	js.Global().Call("requestAnimationFrame", frame)
 }
 
 // GL は生のWebGLコンテキスト(js.Value)を返す。

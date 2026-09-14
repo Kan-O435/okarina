@@ -18,7 +18,6 @@ const DIRECTION_LABELS = {
 let micAudioCtx = null;
 let micAnalyser = null;
 let micBuffer = null;
-let lastFrameTime = null;
 
 micThresholdValueEl.textContent = micThresholdSlider.value + ' dB';
 micThresholdSlider.addEventListener('input', () => {
@@ -26,12 +25,6 @@ micThresholdSlider.addEventListener('input', () => {
 });
 
 function micPitchFrame(timestamp) {
-  if (lastFrameTime === null) {
-    lastFrameTime = timestamp;
-  }
-  const dtSeconds = (timestamp - lastFrameTime) / 1000;
-  lastFrameTime = timestamp;
-
   micAnalyser.getFloatTimeDomainData(micBuffer);
 
   const rms = computeRMS(micBuffer);
@@ -48,9 +41,6 @@ function micPitchFrame(timestamp) {
 
   if (window.goOnPitchDetected) {
     window.goOnPitchDetected(freq);
-  }
-  if (window.goUpdateFrame) {
-    window.goUpdateFrame(dtSeconds);
   }
 
   if (freq > 0) {
@@ -84,7 +74,6 @@ btnStartMicPitch.addEventListener('click', async () => {
 
     micPitchStatusEl.textContent = 'マイク入力を受信中(オタマトーンの音でLinkが前後に動きます)';
     btnStartMicPitch.disabled = true;
-    lastFrameTime = null;
     requestAnimationFrame(micPitchFrame);
   } catch (err) {
     micPitchStatusEl.textContent = 'マイクの取得に失敗しました: ' + err;

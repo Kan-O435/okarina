@@ -12,9 +12,35 @@ func zeroUVs(vertexCount int) []float32 {
 }
 
 // quadIndices は4頂点(v0..v3)で構成される矩形を三角形2枚として描画するための
-// 共通インデックス。quadVertices/linkVertices どちらの頂点順にも対応する。
+// 共通インデックス。quadVertices/verticalQuadVertices どちらの頂点順にも対応する。
 func quadIndices() []uint16 {
 	return []uint16{0, 1, 2, 0, 2, 3}
+}
+
+// quadUVsCropped は、quadVertices/verticalQuadVerticesの4頂点
+// (左下・右下・右上・左上の順)に対応するUV座標を、テクスチャの横方向(U)
+// だけ[u0, u1]の範囲に絞って返す(縦方向Vは0〜1のまま)。画像をそのまま
+// 貼りたい場合はquadUVsCropped(0, 1)を使う。画像の左右に使いたくない部分
+// (枠など)がある場合は、そこを除いた中央部分だけを表示できる。
+func quadUVsCropped(u0, u1 float32) []float32 {
+	return []float32{
+		u0, 0,
+		u1, 0,
+		u1, 1,
+		u0, 1,
+	}
+}
+
+// verticalQuadVertices はXY平面上に立てた、原点(足元中央)から高さheightまでの
+// 板の頂点を返す。扉や看板など、画像テクスチャを正面から貼りたい
+// オブジェクトに使う(quadVerticesは地面のように水平に寝かせる板)。
+func verticalQuadVertices(halfWidth, height float32) []float32 {
+	return []float32{
+		-halfWidth, 0, 0,
+		halfWidth, 0, 0,
+		halfWidth, height, 0,
+		-halfWidth, height, 0,
+	}
 }
 
 // quadVertices はXZ平面上、高さyに配置した矩形(中心がX/Z原点)の頂点を返す。
