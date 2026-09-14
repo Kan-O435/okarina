@@ -1,0 +1,10 @@
+Gobkit Free Low-Poly Nature Kit (41 CC0 Environment Assets)
+Source: https://gobkit.itch.io/gobkit-free-low-poly-nature-kit-41-cc0-environment-assets-glb
+Publisher: Gobkit (https://gobkit.com)
+
+License: CC0 1.0 (public domain)
+Free for any use, commercial or personal, no attribution required.
+
+Used in this project: 10 tree models (TreeHigh001-003, TreeMed001-003,
+TreeLow001-004) under internal/assets/models/trees/, placed around the
+temple field (internal/renderer/demo.go: treeObjects/treePlacements).
