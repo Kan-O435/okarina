@@ -60,6 +60,12 @@ const (
 	// 前面よりさらに手前(道の奥端pathFarZ=-16のすぐ内側)に出す。
 	doorCenterZ = -16.0
 	doorHingeX  = -doorHalfWidth // 扉が開くときに軸となる蝶番のローカルX座標(左端)
+
+	// DoorPassThroughZ は、Linkが扉を「すり抜け終わった」とみなすZ座標
+	// (扉の位置doorCenterZより1.5ユニットさらに奥)。ゲームループ
+	// (internal/game)が、自動前進中のLinkがこの位置まで進んだかどうかの
+	// 判定に使うため、パッケージ外から参照できるようにエクスポートする。
+	DoorPassThroughZ = doorCenterZ - 1.5
 )
 
 // doorOpenAngleRad は扉が全開(progress=1)になったときの回転角。
