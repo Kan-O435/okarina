@@ -93,6 +93,22 @@ func PlayerDirection() string {
 	return player.Player.Direction.String()
 }
 
+// SetDebugDirection は、オタマトーンのピッチ入力を介さずにプレイヤーの
+// 移動方向を直接指定するデバッグ用エントリーポイント(矢印キー操作など)。
+// directionは"forward" | "backward" | "idle"のいずれか。
+func SetDebugDirection(direction string) {
+	var d player.Direction
+	switch direction {
+	case "forward":
+		d = player.Forward
+	case "backward":
+		d = player.Backward
+	default:
+		d = player.Idle
+	}
+	player.Player.SetDirection(d)
+}
+
 // OnMIDIEvent はJS-Go Bridge経由で受け取ったMIDIイベントを
 // 旋律記録エンジン(internal/music.Recorder)に渡す。
 func OnMIDIEvent(e midi.Event) {

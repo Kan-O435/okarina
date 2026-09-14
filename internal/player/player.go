@@ -55,6 +55,12 @@ func frequencyToSemitone(freq float64) float64 {
 	return 12 * math.Log2(freq/440)
 }
 
+// SetDirection はプレイヤーの移動方向を直接指定する。オタマトーンの
+// ピッチ入力を介さないデバッグ操作(矢印キー等)から使う。
+func (s *State) SetDirection(d Direction) {
+	s.Direction = d
+}
+
 // OnPitch はマイクから検出された最新のピッチ(Hz)を受け取り、直前のピッチ
 // との比較から移動方向を更新する。freqが0以下の場合は「音が検出できな
 // かった(無音・音量不足)」として移動を止め、次に音が検出された時点の

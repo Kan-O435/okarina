@@ -19,7 +19,8 @@ func Init() {
 	js.Global().Set("goOpenDoor", js.FuncOf(goOpenDoor))
 	js.Global().Set("goOnPitchDetected", js.FuncOf(goOnPitchDetected))
 	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection)")
+	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection)")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
@@ -81,4 +82,16 @@ func goOnPitchDetected(this js.Value, args []js.Value) interface{} {
 // ("forward" | "backward" | "idle")。UI表示等に使う。
 func goGetPlayerDirection(this js.Value, args []js.Value) interface{} {
 	return game.PlayerDirection()
+}
+
+// goSetDebugDirection はJavaScript側(デバッグ用の矢印キー操作)から、
+// オタマトーンのピッチ入力を介さずにプレイヤーの移動方向を直接指定する。
+// 引数は"forward" | "backward" | "idle"のいずれか。
+func goSetDebugDirection(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		CallConsoleLog("bridge: goSetDebugDirection expects 1 arg (direction)")
+		return nil
+	}
+	game.SetDebugDirection(args[0].String())
+	return nil
 }
