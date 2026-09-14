@@ -77,11 +77,30 @@ game.Run() called
 
 いずれもConsoleと画面下部のログにメッセージが表示されればOK。
 
+### 6. MIDIキーボード入力の確認
+
+MIDIキーボード(Akai MPK Mini MK3等)をPCに接続してからブラウザでページを開くと、
+Web MIDI APIの許可ダイアログが表示される(初回のみ)。許可すると、
+
+- 接続されているMIDI入力デバイス名
+- 鍵盤を弾いた際の `Note ON` / `Note OFF`・Note Number・Velocity
+
+が「MIDI入力」欄に表示される。同時にConsoleにも
+
+```
+[midi] note=60 velocity=100 isNoteOn=true timestamp=...
+```
+
+のようなログがGo側から出力されれば、MIDIキーボード → Web MIDI API → JavaScript
+→ JS-Go Bridge → Go WASM の一連の流れが確認できたことになる。
+
+デバイス未接続時やMIDI非対応ブラウザの場合も、エラーにならず
+「MIDI入力デバイスが見つかりません」等のメッセージが表示される。
+
 ## 今後の予定
 
 - [x] Goプロジェクトを作成する
 - [x] GoをWASMとして実行できるようにする
 - [x] GoとJavaScript間のBridgeを作成する
-- [ ] MIDIデバイスを検出する
-- [ ] MIDI Note ON/OFFを取得する
-- [ ] MIDIイベントをGoへ渡す(Web MIDI APIとの結合)
+- [x] MIDIデバイスを検出する / Note ON/OFFを取得する / MIDIイベントをGoへ渡す
+- [ ] 取得したMIDIイベントをもとにメロディ判定を行う(internal/music)
