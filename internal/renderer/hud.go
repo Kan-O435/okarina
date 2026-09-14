@@ -31,7 +31,9 @@ func BuildSongSheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
 		return nil, err
 	}
 
-	mesh := c.NewMesh(songSheetQuadVertices(widthPx, heightPx), quadUVsCropped(0, 0, 1, 1), quadIndices())
+	// スクリーン座標系(Y下向き)のクアッドに対し、V座標を反転させて渡す
+	// (画像が上下逆さまに表示されるのを防ぐため)。
+	mesh := c.NewMesh(songSheetQuadVertices(widthPx, heightPx), quadUVsCropped(0, 1, 1, 0), quadIndices())
 
 	return &HUD{Program: program, Mesh: mesh, Texture: texture}, nil
 }
