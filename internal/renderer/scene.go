@@ -2,9 +2,12 @@ package renderer
 
 import "github.com/Kan-O435/okarina/internal/vecmath"
 
-// Object は描画する1つのMeshと、その配置(モデル行列)・色をまとめたもの。
+// Object は描画する1つのMeshと、その配置(モデル行列)・テクスチャ・色を
+// まとめたもの。Textureがnilの場合はContext.WhiteTexture()を使う
+// (実質Colorだけで色が決まる)。
 type Object struct {
 	Mesh      *Mesh
+	Texture   *Texture
 	Transform vecmath.Mat4
 	Color     vecmath.Vec3
 }
@@ -21,8 +24,15 @@ type Scene struct {
 func (s *Scene) Render(c *Context) {
 	c.Clear()
 	s.Program.Use(c)
+	s.Program.SetUniformSampler(c, "uTexture", 0)
 
 	for _, obj := range s.Objects {
+		texture := obj.Texture
+		if texture == nil {
+			texture = c.WhiteTexture()
+		}
+		texture.Bind(c)
+
 		mvp := s.ViewProjection.Mul(obj.Transform)
 		s.Program.SetUniformMat4(c, "uMVP", mvp)
 		s.Program.SetUniformVec3(c, "uColor", obj.Color)
