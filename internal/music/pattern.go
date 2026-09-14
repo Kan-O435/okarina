@@ -33,7 +33,24 @@ type ContinuationNote struct {
 const (
 	continuationNormalDur = 350 * time.Millisecond
 	continuationLongDur   = 700 * time.Millisecond // 「ー」で伸ばす音
+	confirmationNoteDur   = 120 * time.Millisecond // 「テレレレレ」の確認音は短く刻む
 )
+
+// SongOfTimeConfirmation は、プレイヤーがSongOfTimeName(前半6音)を正しく
+// 演奏した直後に鳴る、本家のゼルダのような短い確認音(「テレレレレ」)。
+// オクターブ指定が無いため、続きのメロディ(SongOfTimeContinuation)に
+// 近い5オクターブで統一している。
+// ソ₅→ファ#₅→レ#₅→ラ₅→ソ#₅→ミ₅→ソ#₅→ド₅
+var SongOfTimeConfirmation = []ContinuationNote{
+	{MIDINote: 79, Duration: confirmationNoteDur}, // ソ₅
+	{MIDINote: 78, Duration: confirmationNoteDur}, // ファ#₅
+	{MIDINote: 75, Duration: confirmationNoteDur}, // レ#₅
+	{MIDINote: 81, Duration: confirmationNoteDur}, // ラ₅
+	{MIDINote: 80, Duration: confirmationNoteDur}, // ソ#₅
+	{MIDINote: 76, Duration: confirmationNoteDur}, // ミ₅
+	{MIDINote: 80, Duration: confirmationNoteDur}, // ソ#₅
+	{MIDINote: 72, Duration: confirmationNoteDur}, // ド₅
+}
 
 // SongOfTimeContinuation は、プレイヤーがSongOfTimeName(前半6音)を正しく
 // 演奏した後、本家のゼルダのように続けて自動再生される「時の歌」の後半部分。

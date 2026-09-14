@@ -78,7 +78,7 @@ func setSleepHookForTest(f func(time.Duration)) (restore func()) {
 	}
 }
 
-func TestPlaySongOfTimeContinuation_PlaysNotesInOrder(t *testing.T) {
+func TestPlaySongOfTimeAudio_PlaysConfirmationThenContinuation(t *testing.T) {
 	defer setSleepHookForTest(func(time.Duration) {})()
 
 	var played, stopped []int
@@ -86,12 +86,13 @@ func TestPlaySongOfTimeContinuation_PlaysNotesInOrder(t *testing.T) {
 	SetStopNoteFunc(func(note int) { stopped = append(stopped, note) })
 	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
-	playSongOfTimeContinuation()
+	playSongOfTimeAudio()
 
-	if len(played) != len(music.SongOfTimeContinuation) {
-		t.Fatalf("played %d notes, want %d", len(played), len(music.SongOfTimeContinuation))
+	want := append(append([]music.ContinuationNote{}, music.SongOfTimeConfirmation...), music.SongOfTimeContinuation...)
+	if len(played) != len(want) {
+		t.Fatalf("played %d notes, want %d", len(played), len(want))
 	}
-	for i, n := range music.SongOfTimeContinuation {
+	for i, n := range want {
 		if played[i] != n.MIDINote {
 			t.Errorf("played[%d] = %d, want %d", i, played[i], n.MIDINote)
 		}
@@ -101,9 +102,11 @@ func TestPlaySongOfTimeContinuation_PlaysNotesInOrder(t *testing.T) {
 	}
 }
 
-func TestOnMelodyRecorded_SongOfTimeTriggersContinuation(t *testing.T) {
+func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testing.T) {
 	songOfTimePlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
+
+	wantTotal := len(music.SongOfTimeConfirmation) + len(music.SongOfTimeContinuation)
 
 	done := make(chan struct{})
 	var mu sync.Mutex
@@ -113,7 +116,7 @@ func TestOnMelodyRecorded_SongOfTimeTriggersContinuation(t *testing.T) {
 		played = append(played, note)
 		n := len(played)
 		mu.Unlock()
-		if n == len(music.SongOfTimeContinuation) {
+		if n == wantTotal {
 			close(done)
 		}
 	})
@@ -125,6 +128,6 @@ func TestOnMelodyRecorded_SongOfTimeTriggersContinuation(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
-		t.Fatal("continuation was not played within timeout")
+		t.Fatal("confirmation/continuation was not played within timeout")
 	}
 }

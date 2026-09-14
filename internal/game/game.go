@@ -159,7 +159,8 @@ func SetStopNoteFunc(f func(note int)) {
 
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
 // 登録済みの旋律パターンと照合する。時の歌が演奏された場合は隠し扉を開き、
-// 本家のゼルダのように曲の続き(SongOfTimeContinuation)を自動再生する。
+// 本家のゼルダのように確認音(SongOfTimeConfirmation)→曲の続き
+// (SongOfTimeContinuation)の順で自動再生する。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -174,14 +175,15 @@ func onMelodyRecorded(melody music.Melody) {
 		songOfTimePlayed = true
 		fmt.Println("[music] 時の歌が演奏されました。隠し扉が開きます。")
 		OpenDoor()
-		go playSongOfTimeContinuation()
+		go playSongOfTimeAudio()
 	}
 }
 
-// playSongOfTimeContinuation は、プレイヤーが演奏した合図に続けて、時の歌の
-// 後半部分(music.SongOfTimeContinuation)を自動再生する。再生用フックが
-// 未登録(ネイティブビルドやJS未初期化時)の場合は何もしない。
-func playSongOfTimeContinuation() {
+// playSongOfTimeAudio は、プレイヤーが演奏した合図に続けて、確認音
+// (music.SongOfTimeConfirmation)→曲の後半部分(music.SongOfTimeContinuation)
+// の順に自動再生する。再生用フックが未登録(ネイティブビルドやJS未初期化時)
+// の場合は何もしない。
+func playSongOfTimeAudio() {
 	audioHooksMu.Lock()
 	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
 	audioHooksMu.Unlock()
@@ -189,7 +191,13 @@ func playSongOfTimeContinuation() {
 	if play == nil || stop == nil {
 		return
 	}
-	for _, n := range music.SongOfTimeContinuation {
+	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
+	playNotes(play, stop, sleep, music.SongOfTimeContinuation)
+}
+
+// playNotes はnotesを順番に、1音ずつ鳴らして止めてを繰り返しながら再生する。
+func playNotes(play func(note, velocity int), stop func(note int), sleep func(time.Duration), notes []music.ContinuationNote) {
+	for _, n := range notes {
 		play(n.MIDINote, 100)
 		sleep(n.Duration)
 		stop(n.MIDINote)
