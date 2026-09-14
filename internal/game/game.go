@@ -3,6 +3,7 @@ package game
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Kan-O435/okarina/internal/midi"
@@ -159,10 +160,44 @@ func SongOfTimePlayed() bool {
 	return songOfTimePlayed
 }
 
+// audioHooksMu は、下のplayNoteHook・stopNoteHook・sleepHookへの読み書きを
+// 保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の続きを再生する
+// ため、bridge.Init()での差し込みやテストでの差し替えと同時に読まれても
+// 安全なようにしている。
+var audioHooksMu sync.Mutex
+
+// playNoteHook・stopNoteHook は、Goから直接ブラウザの音声再生(Web Audio
+// API、web/audio.jsのplayNote/stopNote)を呼び出すためのフック。
+// bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未初期化時は
+// nilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
+var (
+	playNoteHook func(note, velocity int)
+	stopNoteHook func(note int)
+	sleepHook    = time.Sleep
+)
+
+// SetPlayNoteFunc は、Goから曲を自動再生する際に使う「1音鳴らす」実装を
+// 登録する(bridge.Init()から呼ばれる)。
+func SetPlayNoteFunc(f func(note, velocity int)) {
+	audioHooksMu.Lock()
+	playNoteHook = f
+	audioHooksMu.Unlock()
+}
+
+// SetStopNoteFunc は、Goから曲を自動再生する際に使う「1音止める」実装を
+// 登録する(bridge.Init()から呼ばれる)。
+func SetStopNoteFunc(f func(note int)) {
+	audioHooksMu.Lock()
+	stopNoteHook = f
+	audioHooksMu.Unlock()
+}
+
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律
 // パターンと照合する。扉のメロディ(DOOR_MELODY)または時の歌
 // (music.SongOfTimeName)が演奏された場合、doorOpenDelayだけ「ため」て
-// から隠し扉を開く。
+// から隠し扉を開く。時の歌の場合は、その「ため」の間に確認音
+// (SongOfTimeConfirmation)→曲を最初から通した自動再生
+// (SongOfTimeOpening→SongOfTimeContinuation)も行う。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -175,10 +210,39 @@ func onMelodyRecorded(melody music.Melody) {
 
 	if name == music.SongOfTimeName {
 		songOfTimePlayed = true
+		go playSongOfTimeAudio()
 	}
 
 	if name == doorMelodyName || name == music.SongOfTimeName {
 		fmt.Printf("[music] %s recognized, opening door in %s\n", name, doorOpenDelay)
 		time.AfterFunc(doorOpenDelay, OpenDoor)
+	}
+}
+
+// playSongOfTimeAudio は、プレイヤーが演奏した合図に続けて、確認音
+// (music.SongOfTimeConfirmation)を鳴らした後、本家のゼルダのように
+// 曲を最初から(music.SongOfTimeOpening→music.SongOfTimeContinuation)
+// 通して自動再生する。再生用フックが未登録(ネイティブビルドやJS未初期化時)
+// の場合は何もしない。
+func playSongOfTimeAudio() {
+	audioHooksMu.Lock()
+	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
+	audioHooksMu.Unlock()
+
+	if play == nil || stop == nil {
+		return
+	}
+	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
+	sleep(music.SongOfTimePauseDur)
+	playNotes(play, stop, sleep, music.SongOfTimeOpening)
+	playNotes(play, stop, sleep, music.SongOfTimeContinuation)
+}
+
+// playNotes はnotesを順番に、1音ずつ鳴らして止めてを繰り返しながら再生する。
+func playNotes(play func(note, velocity int), stop func(note int), sleep func(time.Duration), notes []music.ContinuationNote) {
+	for _, n := range notes {
+		play(n.MIDINote, 100)
+		sleep(n.Duration)
+		stop(n.MIDINote)
 	}
 }
