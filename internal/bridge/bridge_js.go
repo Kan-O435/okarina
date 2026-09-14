@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"syscall/js"
 
+	"github.com/Kan-O435/okarina/internal/game"
 	"github.com/Kan-O435/okarina/internal/midi"
 )
 
@@ -15,7 +16,8 @@ import (
 func Init() {
 	js.Global().Set("goPing", js.FuncOf(goPing))
 	js.Global().Set("goOnMIDIEvent", js.FuncOf(goOnMIDIEvent))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent)")
+	js.Global().Set("goOpenDoor", js.FuncOf(goOpenDoor))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor)")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
@@ -46,5 +48,14 @@ func goOnMIDIEvent(this js.Value, args []js.Value) interface{} {
 	}
 	midi.HandleEvent(event)
 	CallConsoleLog(fmt.Sprintf("bridge: MIDI event forwarded to Go: %+v", event))
+	return nil
+}
+
+// goOpenDoor はJavaScript側から呼び出され、隠し扉を開く。
+// 現時点では動作確認用のボタンから直接呼ぶ想定。将来的にはMIDIのメロディ
+// 認識が成功した際にGo側(game.OpenDoor())から呼ばれる形に置き換える。
+func goOpenDoor(this js.Value, args []js.Value) interface{} {
+	game.OpenDoor()
+	CallConsoleLog("bridge: goOpenDoor() called, opening secret door")
 	return nil
 }

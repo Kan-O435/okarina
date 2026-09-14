@@ -3,6 +3,7 @@ const bridgeLogEl = document.getElementById('bridge-log');
 const midiStatusEl = document.getElementById('midi-status');
 const btnPing = document.getElementById('btn-ping');
 const btnMidi = document.getElementById('btn-midi');
+const btnOpenDoor = document.getElementById('btn-open-door');
 
 function appendLog(text) {
   const line = document.createElement('div');
@@ -78,6 +79,7 @@ if (!WebAssembly) {
 
       btnPing.disabled = false;
       btnMidi.disabled = false;
+      btnOpenDoor.disabled = false;
 
       btnPing.addEventListener('click', () => {
         const reply = window.goPing();
@@ -87,6 +89,11 @@ if (!WebAssembly) {
       btnMidi.addEventListener('click', () => {
         window.goOnMIDIEvent(60, 100, true, performance.now());
         appendLog("JS → Go: MIDIイベント(note=60, velocity=100, on=true)を送信しました。Consoleも確認してください。");
+      });
+
+      btnOpenDoor.addEventListener('click', () => {
+        window.goOpenDoor();
+        appendLog("JS → Go: goOpenDoor() を呼びました。隠し扉が開くはずです。");
       });
 
       initMIDI();
