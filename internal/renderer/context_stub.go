@@ -18,3 +18,12 @@ func (c *Context) ClearColor(r, g, b, a float64) {}
 
 // Clear はネイティブビルドでは何もしない。
 func (c *Context) Clear() {}
+
+// EnableDepthTest はネイティブビルドでは何もしない。
+func (c *Context) EnableDepthTest() {}
+
+// Viewport はネイティブビルドでは何もしない。
+func (c *Context) Viewport(width, height int) {}
+
+// CanvasSize はネイティブビルドでは常に0を返す。
+func (c *Context) CanvasSize() (int, int) { return 0, 0 }

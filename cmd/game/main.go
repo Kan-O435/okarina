@@ -20,15 +20,22 @@ func main() {
 	if runtime.GOOS == "js" {
 		bridge.Init()
 
-		// WebGL1コンテキストが取得できるかの疎通確認。
-		// シェーダー・メッシュを使った実際の描画は今後実装する。
 		ctx, err := renderer.NewContext("game-canvas")
 		if err != nil {
 			fmt.Println("renderer: failed to initialize:", err)
 		} else {
-			ctx.ClearColor(0.1, 0.15, 0.25, 1.0)
-			ctx.Clear()
-			fmt.Println("renderer: WebGL1 context initialized")
+			width, height := ctx.CanvasSize()
+			ctx.Viewport(width, height)
+			ctx.EnableDepthTest()
+			ctx.ClearColor(0.53, 0.75, 0.9, 1.0) // 空っぽい水色
+
+			scene, err := renderer.BuildFieldDemoScene(ctx)
+			if err != nil {
+				fmt.Println("renderer: failed to build demo scene:", err)
+			} else {
+				scene.Render(ctx)
+				fmt.Println("renderer: demo scene rendered (ground + link placeholder)")
+			}
 		}
 
 		select {}
