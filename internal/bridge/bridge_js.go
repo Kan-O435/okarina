@@ -22,6 +22,21 @@ func Init() {
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	js.Global().Set("goSwitchGanonBackground", js.FuncOf(goSwitchGanonBackground))
 	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goSwitchGanonBackground)")
+
+	// JS側(web/audio.jsのplayNote/stopNote)の実装をgameパッケージに差し込む。
+	// これにより、Goから「時の歌」の続きなどを自動再生できる。
+	game.SetPlayNoteFunc(callPlayNote)
+	game.SetStopNoteFunc(callStopNote)
+}
+
+// callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
+func callPlayNote(note, velocity int) {
+	js.Global().Call("playNote", note, velocity)
+}
+
+// callStopNote はGoからJavaScript側のstopNote(note)を呼び出す。
+func callStopNote(note int) {
+	js.Global().Call("stopNote", note)
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
