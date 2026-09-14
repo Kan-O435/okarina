@@ -96,6 +96,12 @@ func (c *Context) RunLoop(callback func(dt float64)) {
 	js.Global().Call("requestAnimationFrame", frame)
 }
 
+// Navigate はブラウザを指定したURLへ遷移させる(window.location.href = url)。
+// フィールドをまたぐページ遷移(例: 扉を抜けた先の次のフィールドへ移動)に使う。
+func (c *Context) Navigate(url string) {
+	js.Global().Get("window").Get("location").Set("href", url)
+}
+
 // GL は生のWebGLコンテキスト(js.Value)を返す。
 // シェーダーコンパイルやメッシュ描画など、Contextにまだラップされていない
 // 低レベルなWebGL API呼び出しが必要になった際に使用する。

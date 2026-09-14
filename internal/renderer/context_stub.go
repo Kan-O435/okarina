@@ -25,6 +25,9 @@ func (c *Context) EnableDepthTest() {}
 // EnableBlend はネイティブビルドでは何もしない。
 func (c *Context) EnableBlend() {}
 
+// Navigate はネイティブビルドでは何もしない。
+func (c *Context) Navigate(url string) {}
+
 // Viewport はネイティブビルドでは何もしない。
 func (c *Context) Viewport(width, height int) {}
 

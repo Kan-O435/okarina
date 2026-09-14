@@ -34,7 +34,9 @@ func main() {
 			if err != nil {
 				fmt.Println("renderer: failed to build demo scene:", err)
 			} else {
-				g := game.New(scene, link, doorIndex)
+				g := game.New(scene, link, doorIndex, func() {
+					ctx.Navigate("grassland.html")
+				})
 				game.SetInstance(g)
 
 				ctx.RunLoop(func(dt float64) {
