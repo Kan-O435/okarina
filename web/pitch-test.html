@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ピッチ検出テスト</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  #pitch-display {
+    font-size: 48px;
+    margin: 24px 0 4px;
+  }
+  #note-display {
+    font-size: 24px;
+    color: #7CFC9A;
+    margin-bottom: 16px;
+  }
+  #mic-status {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 8px;
+  }
+  #volume-section {
+    width: 260px;
+    margin-top: 24px;
+  }
+  #volume-section label {
+    font-size: 12px;
+    color: #888;
+  }
+  #volume-meter-track {
+    position: relative;
+    height: 10px;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 4px;
+    margin: 4px 0 12px;
+    overflow: hidden;
+  }
+  #volume-meter {
+    height: 100%;
+    width: 0%;
+    background: #557;
+  }
+  #volume-meter.above-threshold {
+    background: #7CFC9A;
+  }
+  #volume-display {
+    font-size: 12px;
+    color: #aaa;
+  }
+  #threshold-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  #threshold-slider {
+    flex: 1;
+  }
+  #threshold-value {
+    font-size: 12px;
+    color: #aaa;
+    min-width: 48px;
+  }
+</style>
+</head>
+<body>
+
+<h3>オタマトーン ピッチ検出テスト(プロトタイプ)</h3>
+<div id="mic-status">マイクは未接続です</div>
+<button id="btn-start-mic">マイクを開始</button>
+
+<div id="pitch-display">-- Hz</div>
+<div id="note-display">--</div>
+
+<div id="volume-section">
+  <label>現在の音量: <span id="volume-display">-- dB</span></label>
+  <div id="volume-meter-track">
+    <div id="volume-meter"></div>
+  </div>
+  <label>しきい値(これより小さい音は無視)</label>
+  <div id="threshold-row">
+    <input type="range" id="threshold-slider" min="-60" max="-10" value="-30" step="1">
+    <span id="threshold-value">-30 dB</span>
+  </div>
+</div>
+
+<script src="pitch-test.js"></script>
+
+</body>
+</html>
