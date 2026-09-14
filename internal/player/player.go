@@ -36,10 +36,11 @@ func (d Direction) String() string {
 	}
 }
 
-// State はプレイヤー(リンク)の現在位置と移動方向を保持する。
+// State はプレイヤー(リンク)の現在位置・移動方向・向きを保持する。
 type State struct {
 	Z         float64
 	Direction Direction
+	Yaw       float64 // Y軸周りの向き(ラジアン)。進行方向に合わせて変わる。
 
 	lastSemitone float64
 	hasPitch     bool
@@ -85,14 +86,17 @@ func (s *State) OnPitch(freq float64) {
 	s.lastSemitone = semitone
 }
 
-// Update は経過時間dt(秒)に応じてプレイヤーの位置を進め、このフレームで
-// 移動したZ方向の量(ワールド単位)を返す。
+// Update は経過時間dt(秒)に応じてプレイヤーの位置・向きを進め、この
+// フレームで移動したZ方向の量(ワールド単位)を返す。Idle中は位置も
+// 向きも変えず、直前に移動していた方向を向いたままにする。
 func (s *State) Update(dt float64) float64 {
 	var deltaZ float64
 	switch s.Direction {
 	case Forward:
+		s.Yaw = 0
 		deltaZ = -moveSpeed * dt
 	case Backward:
+		s.Yaw = math.Pi
 		deltaZ = moveSpeed * dt
 	default:
 		return 0
