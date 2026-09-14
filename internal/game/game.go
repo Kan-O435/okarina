@@ -26,18 +26,19 @@ func Run() {
 }
 
 // Game は、Sceneと、毎フレーム更新が必要な状態(プレイヤー=Linkの位置・
-// 隠し扉の開閉)をまとめて保持し、Update()でSceneのTransformへ反映する。
+// 向き・隠し扉の開閉)をまとめて保持し、Update()でSceneのTransformへ反映する。
 type Game struct {
 	scene     *renderer.Scene
-	linkIndex int
+	link      renderer.LinkPlacement
 	doorIndex int
 	door      world.Door
 }
 
-// New はSceneと、Link/扉Objectのインデックス(BuildFieldDemoSceneが返す)
-// からGameを組み立てる。
-func New(scene *renderer.Scene, linkIndex, doorIndex int) *Game {
-	return &Game{scene: scene, linkIndex: linkIndex, doorIndex: doorIndex}
+// New はSceneと、Link/扉Objectの配置情報(BuildFieldDemoSceneが返す)から
+// Gameを組み立てる。プレイヤーの初期位置をLinkのスポーン地点に合わせる。
+func New(scene *renderer.Scene, link renderer.LinkPlacement, doorIndex int) *Game {
+	player.Player.Z = link.SpawnZ
+	return &Game{scene: scene, link: link, doorIndex: doorIndex}
 }
 
 // OpenDoor は隠し扉を開き始める。何らかの「特定の動作」(将来的にはMIDIの
@@ -47,15 +48,17 @@ func (g *Game) OpenDoor() {
 }
 
 // Update はdeltaTime(秒)だけゲーム状態を進め、扉・プレイヤー(Link)の
-// 見た目(Transform)に反映する。
+// 見た目(Transform)に反映する。プレイヤーは前進/後退に応じて位置だけで
+// なく向き(Yaw)も変わるため、毎フレームTransformを一から組み立て直す。
 func (g *Game) Update(dt float64) {
 	g.door.Update(dt)
 	g.scene.Objects[g.doorIndex].Transform = renderer.DoorTransform(g.door.Progress)
 
 	deltaZ := player.Player.Update(dt)
-	if deltaZ != 0 && g.linkIndex >= 0 {
-		move := vecmath.Translate(vecmath.NewVec3(0, 0, deltaZ))
-		g.scene.Objects[g.linkIndex].Transform = move.Mul(g.scene.Objects[g.linkIndex].Transform)
+	if deltaZ != 0 {
+		worldPos := vecmath.Translate(vecmath.NewVec3(0, 0, player.Player.Z))
+		facing := vecmath.RotateY(player.Player.Yaw)
+		g.scene.Objects[g.link.Index].Transform = worldPos.Mul(facing).Mul(g.link.LocalTransform)
 	}
 }
 
@@ -78,6 +81,8 @@ func OpenDoor() {
 
 // OnPitchDetected はマイクから検出された最新のピッチ(Hz)をプレイヤーの
 // 移動方向判定に渡す。ピッチが検出できなかった場合はfreqに0以下を渡す。
+// 実際のプレイヤー移動は、Go側で常時回っているゲームループ
+// (Context.RunLoop、cmd/game/main.go参照)がGame.Update()経由で進める。
 func OnPitchDetected(freq float64) {
 	player.Player.OnPitch(freq)
 }
@@ -86,6 +91,22 @@ func OnPitchDetected(freq float64) {
 // ("forward" | "backward" | "idle")。UI表示など、JS側からの参照用。
 func PlayerDirection() string {
 	return player.Player.Direction.String()
+}
+
+// SetDebugDirection は、オタマトーンのピッチ入力を介さずにプレイヤーの
+// 移動方向を直接指定するデバッグ用エントリーポイント(矢印キー操作など)。
+// directionは"forward" | "backward" | "idle"のいずれか。
+func SetDebugDirection(direction string) {
+	var d player.Direction
+	switch direction {
+	case "forward":
+		d = player.Forward
+	case "backward":
+		d = player.Backward
+	default:
+		d = player.Idle
+	}
+	player.Player.SetDirection(d)
 }
 
 // OnMIDIEvent はJS-Go Bridge経由で受け取ったMIDIイベントを

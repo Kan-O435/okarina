@@ -1,6 +1,9 @@
 package player
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestOnPitch_RisingFrequencyMovesForward(t *testing.T) {
 	s := &State{}
@@ -59,5 +62,31 @@ func TestOnPitch_SilenceResetsBaseline(t *testing.T) {
 	s.OnPitch(1000)
 	if s.Direction != Idle {
 		t.Fatalf("expected Idle on the first pitch after silence, got %v", s.Direction)
+	}
+}
+
+func TestUpdate_FacesMovementDirection(t *testing.T) {
+	s := &State{}
+	s.OnPitch(300)
+	s.OnPitch(400) // Forward
+	s.Update(0.1)
+	if s.Yaw != math.Pi {
+		t.Fatalf("expected Yaw=Pi while moving forward, got %v", s.Yaw)
+	}
+
+	s.OnPitch(300) // Backward
+	s.Update(0.1)
+	if s.Yaw != 0 {
+		t.Fatalf("expected Yaw=0 while moving backward, got %v", s.Yaw)
+	}
+
+	// Idleになっても、直前に向いていた方向を保つ(不自然に正面へ戻さない)。
+	s.OnPitch(300) // 変化なし → Idle
+	s.Update(0.1)
+	if s.Direction != Idle {
+		t.Fatalf("expected Idle, got %v", s.Direction)
+	}
+	if s.Yaw != 0 {
+		t.Fatalf("expected Yaw to stay at 0 while Idle, got %v", s.Yaw)
 	}
 }
