@@ -43,17 +43,17 @@ const (
 // SongOfTimeConfirmation は、プレイヤーがSongOfTimeName(前半6音)を正しく
 // 演奏した直後に鳴る、本家のゼルダのような短い確認音(「テレレレレ」)。
 // オクターブ指定が無いため、続きのメロディ(SongOfTimeContinuation)より
-// 2オクターブ高い7オクターブで鳴らしている。
-// ソ₇→ファ#₇→レ#₇→ラ₇→ソ#₇→ミ₇→ソ#₇→ド₇
+// 1オクターブ高い6オクターブで鳴らしている。
+// ソ₆→ファ#₆→レ#₆→ラ₆→ソ#₆→ミ₆→ソ#₆→ド₆
 var SongOfTimeConfirmation = []ContinuationNote{
-	{MIDINote: 103, Duration: confirmationNoteDur}, // ソ₇
-	{MIDINote: 102, Duration: confirmationNoteDur}, // ファ#₇
-	{MIDINote: 99, Duration: confirmationNoteDur},  // レ#₇
-	{MIDINote: 105, Duration: confirmationNoteDur}, // ラ₇
-	{MIDINote: 104, Duration: confirmationNoteDur}, // ソ#₇
-	{MIDINote: 100, Duration: confirmationNoteDur}, // ミ₇
-	{MIDINote: 104, Duration: confirmationNoteDur}, // ソ#₇
-	{MIDINote: 96, Duration: confirmationNoteDur},  // ド₇
+	{MIDINote: 91, Duration: confirmationNoteDur}, // ソ₆
+	{MIDINote: 90, Duration: confirmationNoteDur}, // ファ#₆
+	{MIDINote: 87, Duration: confirmationNoteDur}, // レ#₆
+	{MIDINote: 93, Duration: confirmationNoteDur}, // ラ₆
+	{MIDINote: 92, Duration: confirmationNoteDur}, // ソ#₆
+	{MIDINote: 88, Duration: confirmationNoteDur}, // ミ₆
+	{MIDINote: 92, Duration: confirmationNoteDur}, // ソ#₆
+	{MIDINote: 84, Duration: confirmationNoteDur}, // ド₆
 }
 
 // SongOfTimeContinuation は、プレイヤーがSongOfTimeName(前半6音)を正しく
