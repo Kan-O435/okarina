@@ -18,6 +18,14 @@ import (
 // 終わったとみなす無音時間。
 const melodyIdleTimeout = 2 * time.Second
 
+// doorMelodyName は、隠し扉を開くメロディに対応するmusic.Patternの名前
+// (internal/music/pattern.goのDefaultPatterns参照)。
+const doorMelodyName = "DOOR_MELODY"
+
+// doorOpenDelay は、扉のメロディが認識されてから実際に扉が開き始めるまでの
+// 「ため」の時間。varにしているのはテストから短く差し替えられるようにするため。
+var doorOpenDelay = 7 * time.Second
+
 var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
 // Run はゲームのエントリーポイント。
@@ -33,13 +41,25 @@ type Game struct {
 	link      renderer.LinkPlacement
 	doorIndex int
 	door      world.Door
+
+	// autoWalking は、扉が開いた後にプレイヤー入力を無視してLinkを
+	// 自動で前進させ続けている(扉をすり抜ける演出中の)状態かどうか。
+	autoWalking bool
+	// transitioned は、onFieldTransitionをすでに呼んだかどうか
+	// (Zがしきい値を超え続けても二重に呼ばないためのガード)。
+	transitioned bool
+	// onFieldTransition は、Linkが扉を通過し終えたときに1回だけ呼ばれる
+	// コールバック(次のフィールドへのページ遷移などに使う)。
+	onFieldTransition func()
 }
 
 // New はSceneと、Link/扉Objectの配置情報(BuildFieldDemoSceneが返す)から
 // Gameを組み立てる。プレイヤーの初期位置をLinkのスポーン地点に合わせる。
-func New(scene *renderer.Scene, link renderer.LinkPlacement, doorIndex int) *Game {
+// onFieldTransitionは、扉が開いた後にLinkが自動で前進して扉を通過し終えた
+// タイミングで1回だけ呼ばれる(nilなら何も起きない)。
+func New(scene *renderer.Scene, link renderer.LinkPlacement, doorIndex int, onFieldTransition func()) *Game {
 	player.Player.Z = link.SpawnZ
-	return &Game{scene: scene, link: link, doorIndex: doorIndex}
+	return &Game{scene: scene, link: link, doorIndex: doorIndex, onFieldTransition: onFieldTransition}
 }
 
 // OpenDoor は隠し扉を開き始める。何らかの「特定の動作」(将来的にはMIDIの
@@ -51,15 +71,33 @@ func (g *Game) OpenDoor() {
 // Update はdeltaTime(秒)だけゲーム状態を進め、扉・プレイヤー(Link)の
 // 見た目(Transform)に反映する。プレイヤーは前進/後退に応じて位置だけで
 // なく向き(Yaw)も変わるため、毎フレームTransformを一から組み立て直す。
+//
+// 扉が全開(DoorOpened)になった後は、プレイヤー入力(マイク/デバッグキー)を
+// 無視してLinkを自動で前進させ続け、扉をすり抜けた位置
+// (renderer.DoorPassThroughZ)まで進んだらonFieldTransitionを1回だけ呼ぶ。
 func (g *Game) Update(dt float64) {
 	g.door.Update(dt)
 	g.scene.Objects[g.doorIndex].Transform = renderer.DoorTransform(g.door.Progress)
+
+	if !g.autoWalking && g.door.State == world.DoorOpened {
+		g.autoWalking = true
+	}
+	if g.autoWalking {
+		player.Player.SetDirection(player.Forward)
+	}
 
 	deltaZ := player.Player.Update(dt)
 	if deltaZ != 0 {
 		worldPos := vecmath.Translate(vecmath.NewVec3(0, 0, player.Player.Z))
 		facing := vecmath.RotateY(player.Player.Yaw)
 		g.scene.Objects[g.link.Index].Transform = worldPos.Mul(facing).Mul(g.link.LocalTransform)
+	}
+
+	if g.autoWalking && !g.transitioned && player.Player.Z <= renderer.DoorPassThroughZ {
+		g.transitioned = true
+		if g.onFieldTransition != nil {
+			g.onFieldTransition()
+		}
 	}
 }
 
@@ -157,10 +195,12 @@ func SetStopNoteFunc(f func(note int)) {
 	audioHooksMu.Unlock()
 }
 
-// onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
-// 登録済みの旋律パターンと照合する。時の歌が演奏された場合は隠し扉を開き、
-// 本家のゼルダのように確認音(SongOfTimeConfirmation)→曲の続き
-// (SongOfTimeContinuation)の順で自動再生する。
+// onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律
+// パターンと照合する。扉のメロディ(DOOR_MELODY)または時の歌
+// (music.SongOfTimeName)が演奏された場合、doorOpenDelayだけ「ため」て
+// から隠し扉を開く。時の歌の場合は、その「ため」の間に確認音
+// (SongOfTimeConfirmation)→曲を最初から通した自動再生
+// (SongOfTimeOpening→SongOfTimeContinuation)も行う。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -169,13 +209,16 @@ func onMelodyRecorded(melody music.Melody) {
 		fmt.Println("[music] recognized: (no match)")
 		return
 	}
-
 	fmt.Printf("[music] recognized: %s\n", name)
+
 	if name == music.SongOfTimeName {
 		songOfTimePlayed = true
-		fmt.Println("[music] 時の歌が演奏されました。隠し扉が開きます。")
-		OpenDoor()
 		go playSongOfTimeAudio()
+	}
+
+	if name == doorMelodyName || name == music.SongOfTimeName {
+		fmt.Printf("[music] %s recognized, opening door in %s\n", name, doorOpenDelay)
+		time.AfterFunc(doorOpenDelay, OpenDoor)
 	}
 }
 

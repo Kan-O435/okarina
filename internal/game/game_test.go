@@ -48,7 +48,7 @@ func TestOnMelodyRecorded_PartialSongDoesNotSetFlag(t *testing.T) {
 	}
 }
 
-func TestOnMelodyRecorded_SongOfTimeOpensDoor(t *testing.T) {
+func TestOnMelodyRecorded_SongOfTimeOpensDoorAfterDelay(t *testing.T) {
 	songOfTimePlayed = false
 	g := &Game{
 		scene:     &renderer.Scene{Objects: []renderer.Object{{}}},
@@ -57,10 +57,21 @@ func TestOnMelodyRecorded_SongOfTimeOpensDoor(t *testing.T) {
 	SetInstance(g)
 	defer SetInstance(nil)
 
+	// 扉が開くまでの「ため」の時間はテストでは短くしておく。
+	origDelay := doorOpenDelay
+	doorOpenDelay = time.Millisecond
+	defer func() { doorOpenDelay = origDelay }()
+
 	onMelodyRecorded(songOfTime)
 
+	if g.door.State != world.DoorClosed {
+		t.Fatalf("expected door to remain closed immediately after recognition, got state=%v", g.door.State)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
 	if g.door.State != world.DoorOpening {
-		t.Fatalf("expected door to start opening, got state=%v", g.door.State)
+		t.Fatalf("expected door to start opening after the delay, got state=%v", g.door.State)
 	}
 }
 
