@@ -114,6 +114,7 @@ type bufferView struct {
 	Buffer     int `json:"buffer"`
 	ByteOffset int `json:"byteOffset"`
 	ByteLength int `json:"byteLength"`
+	ByteStride int `json:"byteStride"` // 0の場合は詰め込み(要素サイズ=stride)
 }
 
 type material struct {
@@ -429,15 +430,26 @@ func readFloat32Accessor(doc *document, bin []byte, accessorIdx int) ([]float32,
 		return nil, err
 	}
 
+	// 複数のattribute(POSITION/NORMAL/TEXCOORD_0等)が1つのbufferViewに
+	// インターリーブ(要素ごとに交互配置)されている場合、bufferView.byteStride
+	// が要素間の実際のバイト間隔を示す。0(未指定)なら詰め込み(=要素サイズ)。
+	elementSize := componentsPerElement * 4
+	stride := bv.ByteStride
+	if stride == 0 {
+		stride = elementSize
+	}
+
 	start := bv.ByteOffset + acc.ByteOffset
-	count := acc.Count * componentsPerElement
-	out := make([]float32, count)
-	for i := 0; i < count; i++ {
-		off := start + i*4
-		if off+4 > len(bin) {
-			return nil, errors.New("gltf: accessor data out of bounds")
+	out := make([]float32, acc.Count*componentsPerElement)
+	for elem := 0; elem < acc.Count; elem++ {
+		elemStart := start + elem*stride
+		for c := 0; c < componentsPerElement; c++ {
+			off := elemStart + c*4
+			if off+4 > len(bin) {
+				return nil, errors.New("gltf: accessor data out of bounds")
+			}
+			out[elem*componentsPerElement+c] = math.Float32frombits(binary.LittleEndian.Uint32(bin[off : off+4]))
 		}
-		out[i] = math.Float32frombits(binary.LittleEndian.Uint32(bin[off : off+4]))
 	}
 	return out, nil
 }
