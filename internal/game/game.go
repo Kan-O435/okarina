@@ -115,14 +115,31 @@ func OnMIDIEvent(e midi.Event) {
 	recorder.HandleEvent(e)
 }
 
+// ocarinaSongPlayed は、オカリナの曲(music.OcarinaSongName)が正しく演奏
+// されたことを示す。演奏させる場所(トリガー地点)はまだ決まっていないため、
+// 現時点では判定結果を保持するだけで、実際のゲームイベントとの接続は
+// 別途行う。
+var ocarinaSongPlayed bool
+
+// OcarinaSongPlayed は、オカリナの曲が正しく演奏されたかどうかを返す。
+func OcarinaSongPlayed() bool {
+	return ocarinaSongPlayed
+}
+
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
 // 登録済みの旋律パターンと照合する。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
-	if name := music.Recognize(melody, music.DefaultPatterns); name != "" {
-		fmt.Printf("[music] recognized: %s\n", name)
-	} else {
+	name := music.Recognize(melody, music.DefaultPatterns)
+	if name == "" {
 		fmt.Println("[music] recognized: (no match)")
+		return
+	}
+
+	fmt.Printf("[music] recognized: %s\n", name)
+	if name == music.OcarinaSongName {
+		ocarinaSongPlayed = true
+		fmt.Println("[music] オカリナの曲を正しく演奏しました!")
 	}
 }
