@@ -10,7 +10,7 @@ import (
 // このファイルは「時の神殿」フィールド(docs/fields/temple-of-time.md参照)の
 // 土台となるデモシーンを組み立てる。
 //
-// 自作で完結する部分(地面・道・プール・階段)は実寸で配置する。
+// 自作で完結する部分(地面・道・プール)は実寸で配置する。
 // 建物本体+双尖塔はTripo3Dで生成・リメッシュ済みのGLB(internal/assets)を
 // go:embedで読み込んで実際に配置している。扉(#3)はまだ3Dモデル自体は無いが、
 // CC0のドア画像(internal/assets.DoorTexture)を貼った板で見た目を確保している。
@@ -20,7 +20,7 @@ const (
 
 	pathHalfWidth = 2.0
 	pathNearZ     = 22.0  // 道の手前端(スポーン地点)
-	pathFarZ      = -16.0 // 道の奥端(階段の手前)
+	pathFarZ      = -16.0 // 道の奥端(神殿の手前)
 
 	poolHalfWidth = 2.0
 	poolHalfDepth = 4.0
@@ -30,36 +30,43 @@ const (
 	linkSpawnZ       = poolCenterZ + poolHalfDepth // Linkの足元をプール手前端(カメラ側の辺)に揃える
 	linkTargetHeight = 1.4                         // KayKit Knightモデルをこの高さになるようスケールする
 
-	stepHalfWidth = 3.0
-	stepHalfDepth = 0.5
-
 	buildingTargetHeight = 10.0 // GLBモデルをこの高さになるようスケールする
-	buildingCenterZ      = -24.0
+	// buildingCenterZ: 道の奥端(pathFarZ=-16)との隙間を詰めるため手前に寄せた
+	// (実測の建物前面はbuildingCenterZ+buildingHalfDepthMeasuredになる。
+	// 沈める(Yをずらす)のではなく、地面(Y=0)に正しく立てたままZだけ動かす)。
+	buildingCenterZ = -21.0
 
-	// doorHalfWidth は、扉画像から左右の石枠(doorTextureU0〜U1の外側)を
-	// 除いてトリミングした後の見た目の幅に合わせた値(ピクセル密度を
-	// doorHeightと揃えて算出: (395-130)px ÷ (512px/doorHeight))。
-	doorHalfWidth = 0.775
-	doorHeight    = 3.0
-	// 扉画像(512x512)は、中央の木の扉の両脇に白っぽい石枠が写っている。
-	// U座標をこの範囲に絞ることで、左右の石枠を除いて中央の扉部分だけを
-	// 表示する(ピクセル座標130〜395を実測して算出)。
+	// 扉画像(512x512)は、中央の木の扉の周りに白っぽい石枠・透過の余白が
+	// 写っている。実測したところ、木の扉本体はピクセル座標で
+	// x=130〜395(左右の石枠を除く)、y=28〜474(上下の透過の余白を除く、
+	// PNGは上端がy=0)の範囲。UV座標をこの範囲に絞ることで、扉の絵だけが
+	// quadいっぱいに表示されるようにする(下に透過部分があると、そこから
+	// 背景の建物本体の壁の色が透けて「白い余白」のように見えてしまうため)。
 	doorTextureU0 = 130.0 / 512.0
 	doorTextureU1 = 395.0 / 512.0
+	// NewImageTextureはUNPACK_FLIP_Y_WEBGLで画像を上下反転して取り込むため、
+	// V座標は「1 - (PNGのy座標/512)」で計算する(V=0がPNGの下端に対応)。
+	doorTextureV0 = 1.0 - 474.0/512.0 // PNG y=474(扉の下端)に対応
+	doorTextureV1 = 1.0 - 28.0/512.0  // PNG y=28(扉の上端)に対応
+
+	// doorHalfWidth/doorHeight は、上記のトリミング後の扉画像(265x446px)を
+	// ピクセル密度が縦横で揃うようスケールした見た目のサイズ。
+	// (基準: 512px = doorHeightを出す前のスケール0.005859 units/px)
+	doorHalfWidth = 0.56
+	doorHeight    = 1.9
 	// 建物本体(Tripo3D生成GLB)は高さ10へ自動スケールすると最前面が
-	// 世界座標Z=-20.73付近まで張り出す(bounding boxから逆算した実測値)。
-	// 旧プレースホルダーboxの寸法を前提にZ=-20.5としていたため、実モデルに
-	// 差し替わった際に扉が建物の中に埋もれて見えなくなっていた。
-	// 最終段(Z=-18)と建物の間に確実に収まるよう手前に出す。
-	doorCenterZ = -19.0
+	// buildingCenterZ+buildingHalfDepthMeasured ≈ -17.73まで張り出す
+	// (bounding boxから逆算した実測値)。扉が建物の中に埋もれないよう、
+	// 前面よりさらに手前(道の奥端pathFarZ=-16のすぐ内側)に出す。
+	doorCenterZ = -16.0
 	doorHingeX  = -doorHalfWidth // 扉が開くときに軸となる蝶番のローカルX座標(左端)
 )
 
 // doorOpenAngleRad は扉が全開(progress=1)になったときの回転角。
 var doorOpenAngleRad = vecmath.Radians(100)
 
-// BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール・階段+
-// 建物/塔/扉のプレースホルダー)を配置したSceneを組み立てる。
+// BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール+
+// 建物本体・扉・Link)を配置したSceneを組み立てる。
 // 戻り値のlinkIndexはLinkに対応するObjectのインデックス(プレイヤー移動に
 // 合わせて呼び出し側がTransformを書き換えるために使う)、doorIndexは扉
 // Objectのインデックス(毎フレーム扉のTransformを更新するために使う)。
@@ -73,8 +80,8 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int
 	aspect := float64(width) / float64(height)
 	projection := vecmath.Perspective(vecmath.Radians(55), aspect, 0.1, 150)
 	view := vecmath.LookAt(
-		vecmath.NewVec3(0, 6.6, 0.7), // カメラ位置: 神殿(塔)に寄せた高さ・距離。前回よりさらに近づけて調整中
-		vecmath.NewVec3(0, 3, -15),   // 注視点: 神殿の手前あたり
+		vecmath.NewVec3(0, 6.24, 6.03),  // カメラ位置: 手前の枠が池の手前端の少し手前(Z=-5、緑が少し残る程度)、左右の枠が木のライン(X=±7.8)に合うよう計算
+		vecmath.NewVec3(0, 5.72, -8.96), // 注視点: 神殿の手前あたり
 		vecmath.NewVec3(0, 1, 0),
 	)
 
@@ -84,8 +91,6 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int
 		poolObject(c, -poolOffsetX),
 		poolObject(c, poolOffsetX),
 	}
-	objects = append(objects, stepObjects(c)...)
-
 	templeBody, err := templeBodyObject(c)
 	if err != nil {
 		return nil, -1, -1, err
@@ -145,21 +150,6 @@ func poolObject(c *Context, offsetX float32) Object {
 	return Object{Mesh: mesh, Transform: transform, Color: vecmath.NewVec3(0.25, 0.45, 0.65)}
 }
 
-// stepObjects は神殿の手前に、奥に向かって徐々に高くなる階段を3段配置する。
-func stepObjects(c *Context) []Object {
-	heights := []float32{0.4, 0.8, 1.2}
-	zPositions := []float32{-16, -17, -18}
-
-	objects := make([]Object, 0, len(heights))
-	for i, h := range heights {
-		verts := boxVertices(stepHalfWidth, h, stepHalfDepth)
-		mesh := c.NewMesh(verts, zeroUVs(8), boxIndices())
-		transform := vecmath.Translate(vecmath.NewVec3(0, 0, float64(zPositions[i])))
-		objects = append(objects, Object{Mesh: mesh, Transform: transform, Color: vecmath.NewVec3(0.55, 0.53, 0.5)})
-	}
-	return objects
-}
-
 // templeBodyObject は、Tripo3Dで生成・リメッシュ済みの建物本体+双尖塔GLB
 // (internal/assets.TempleBody)を読み込み、地面のbuildingCenterZの位置に
 // 高さbuildingTargetHeightで立つよう配置する。
@@ -184,7 +174,7 @@ func doorObject(c *Context) (Object, error) {
 	}
 
 	verts := verticalQuadVertices(doorHalfWidth, doorHeight)
-	mesh := c.NewMesh(verts, quadUVsCropped(doorTextureU0, doorTextureU1), quadIndices())
+	mesh := c.NewMesh(verts, quadUVsCropped(doorTextureU0, doorTextureV0, doorTextureU1, doorTextureV1), quadIndices())
 	return Object{
 		Mesh:      mesh,
 		Texture:   texture,
@@ -202,7 +192,7 @@ func DoorTransform(progress float64) vecmath.Mat4 {
 	toHinge := vecmath.Translate(vecmath.NewVec3(doorHingeX, 0, 0))
 	fromHinge := vecmath.Translate(vecmath.NewVec3(-doorHingeX, 0, 0))
 	rotate := vecmath.RotateY(angle)
-	toWorld := vecmath.Translate(vecmath.NewVec3(0, 0, doorCenterZ))
+	toWorld := vecmath.Translate(vecmath.NewVec3(0, doorHeight/2, doorCenterZ))
 
 	return toWorld.Mul(toHinge).Mul(rotate).Mul(fromHinge)
 }
