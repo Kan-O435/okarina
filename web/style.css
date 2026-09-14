@@ -20,12 +20,14 @@ canvas {
   background: #000;
   border: 1px solid #333;
 }
-#bridge-controls {
+#bridge-controls,
+#audio-controls {
   margin-top: 12px;
   display: flex;
   gap: 8px;
 }
-#bridge-controls button {
+#bridge-controls button,
+#audio-controls button {
   background: #222;
   color: #eee;
   border: 1px solid #444;
@@ -34,7 +36,8 @@ canvas {
   font-size: 13px;
   cursor: pointer;
 }
-#bridge-controls button:disabled {
+#bridge-controls button:disabled,
+#audio-controls button:disabled {
   opacity: 0.4;
   cursor: default;
 }

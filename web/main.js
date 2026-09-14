@@ -3,6 +3,8 @@ const bridgeLogEl = document.getElementById('bridge-log');
 const midiStatusEl = document.getElementById('midi-status');
 const btnPing = document.getElementById('btn-ping');
 const btnMidi = document.getElementById('btn-midi');
+const btnEnableAudio = document.getElementById('btn-enable-audio');
+const btnTestSound = document.getElementById('btn-test-sound');
 
 function appendLog(text) {
   const line = document.createElement('div');
@@ -61,6 +63,12 @@ function onMIDIMessage(event) {
 
   appendMidiStatus((isNoteOn ? "Note ON  " : "Note OFF ") + "note=" + note + " velocity=" + velocity);
 
+  if (isNoteOn) {
+    playNote(note, velocity);
+  } else {
+    stopNote(note);
+  }
+
   if (window.goOnMIDIEvent) {
     window.goOnMIDIEvent(note, velocity, isNoteOn, event.timeStamp);
   }
@@ -87,6 +95,17 @@ if (!WebAssembly) {
       btnMidi.addEventListener('click', () => {
         window.goOnMIDIEvent(60, 100, true, performance.now());
         appendLog("JS → Go: MIDIイベント(note=60, velocity=100, on=true)を送信しました。Consoleも確認してください。");
+      });
+
+      btnEnableAudio.addEventListener('click', () => {
+        ensureAudioContext();
+        appendLog("オーディオを有効化しました");
+      });
+
+      btnTestSound.addEventListener('click', () => {
+        playNote(60, 100);
+        setTimeout(() => stopNote(60), 500);
+        appendLog("テスト再生: note=60 を0.5秒鳴らしました");
       });
 
       initMIDI();
