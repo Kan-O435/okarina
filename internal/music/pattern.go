@@ -37,19 +37,19 @@ const (
 
 // SongOfTimeContinuation は、プレイヤーがSongOfTimeName(前半6音)を正しく
 // 演奏した後、本家のゼルダのように続けて自動再生される「時の歌」の後半部分。
-// ラ→ド→シー→ソー→ファ→ソ→ラー→レ→ド→ミ→レー
+// ラ₄→ド₅→シ₄ー→ソ₄ー→ファ₄→ソ₄→ラ₄ー｜レ₅→ド₅→ミ₅→レ₅ー
 var SongOfTimeContinuation = []ContinuationNote{
-	{MIDINote: 81, Duration: continuationNormalDur}, // ラ
-	{MIDINote: 84, Duration: continuationNormalDur}, // ド
-	{MIDINote: 83, Duration: continuationLongDur},   // シー
-	{MIDINote: 79, Duration: continuationLongDur},   // ソー
-	{MIDINote: 77, Duration: continuationNormalDur}, // ファ
-	{MIDINote: 79, Duration: continuationNormalDur}, // ソ
-	{MIDINote: 81, Duration: continuationLongDur},   // ラー
-	{MIDINote: 86, Duration: continuationNormalDur}, // レ
-	{MIDINote: 84, Duration: continuationNormalDur}, // ド
-	{MIDINote: 88, Duration: continuationNormalDur}, // ミ
-	{MIDINote: 86, Duration: continuationLongDur},   // レー
+	{MIDINote: 69, Duration: continuationNormalDur}, // ラ₄
+	{MIDINote: 72, Duration: continuationNormalDur}, // ド₅
+	{MIDINote: 71, Duration: continuationLongDur},   // シ₄ー
+	{MIDINote: 67, Duration: continuationLongDur},   // ソ₄ー
+	{MIDINote: 65, Duration: continuationNormalDur}, // ファ₄
+	{MIDINote: 67, Duration: continuationNormalDur}, // ソ₄
+	{MIDINote: 69, Duration: continuationLongDur},   // ラ₄ー
+	{MIDINote: 74, Duration: continuationNormalDur}, // レ₅
+	{MIDINote: 72, Duration: continuationNormalDur}, // ド₅
+	{MIDINote: 76, Duration: continuationNormalDur}, // ミ₅
+	{MIDINote: 74, Duration: continuationLongDur},   // レ₅ー
 }
 
 // Recognize は演奏されたMelodyが登録済みPatternのいずれかと完全一致するか判定する。
