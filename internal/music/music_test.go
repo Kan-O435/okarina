@@ -31,14 +31,14 @@ func TestRecognize(t *testing.T) {
 	}
 }
 
-func TestRecognize_OcarinaSong(t *testing.T) {
-	// ラ→レ→ファ→ラ→レ→ファ
+func TestRecognize_SongOfTime(t *testing.T) {
+	// 時の歌: ラ→レ→ファ→ラ→レ→ファ
 	melody := Melody{
 		{Pitch: A}, {Pitch: D}, {Pitch: F},
 		{Pitch: A}, {Pitch: D}, {Pitch: F},
 	}
-	if name := Recognize(melody, DefaultPatterns); name != OcarinaSongName {
-		t.Errorf("Recognize() = %q, want %s", name, OcarinaSongName)
+	if name := Recognize(melody, DefaultPatterns); name != SongOfTimeName {
+		t.Errorf("Recognize() = %q, want %s", name, SongOfTimeName)
 	}
 
 	wrongOrder := Melody{

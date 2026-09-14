@@ -115,19 +115,17 @@ func OnMIDIEvent(e midi.Event) {
 	recorder.HandleEvent(e)
 }
 
-// ocarinaSongPlayed は、オカリナの曲(music.OcarinaSongName)が正しく演奏
-// されたことを示す。演奏させる場所(トリガー地点)はまだ決まっていないため、
-// 現時点では判定結果を保持するだけで、実際のゲームイベントとの接続は
-// 別途行う。
-var ocarinaSongPlayed bool
+// songOfTimePlayed は、時の歌(music.SongOfTimeName)が正しく演奏された
+// ことを示す。
+var songOfTimePlayed bool
 
-// OcarinaSongPlayed は、オカリナの曲が正しく演奏されたかどうかを返す。
-func OcarinaSongPlayed() bool {
-	return ocarinaSongPlayed
+// SongOfTimePlayed は、時の歌が正しく演奏されたかどうかを返す。
+func SongOfTimePlayed() bool {
+	return songOfTimePlayed
 }
 
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
-// 登録済みの旋律パターンと照合する。
+// 登録済みの旋律パターンと照合する。時の歌が演奏された場合は隠し扉を開く。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -138,8 +136,9 @@ func onMelodyRecorded(melody music.Melody) {
 	}
 
 	fmt.Printf("[music] recognized: %s\n", name)
-	if name == music.OcarinaSongName {
-		ocarinaSongPlayed = true
-		fmt.Println("[music] オカリナの曲を正しく演奏しました!")
+	if name == music.SongOfTimeName {
+		songOfTimePlayed = true
+		fmt.Println("[music] 時の歌が演奏されました。隠し扉が開きます。")
+		OpenDoor()
 	}
 }
