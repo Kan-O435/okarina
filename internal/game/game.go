@@ -192,6 +192,7 @@ func playSongOfTimeAudio() {
 		return
 	}
 	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
+	sleep(music.SongOfTimePauseDur)
 	playNotes(play, stop, sleep, music.SongOfTimeContinuation)
 }
 

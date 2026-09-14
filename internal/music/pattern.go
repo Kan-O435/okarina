@@ -34,22 +34,26 @@ const (
 	continuationNormalDur = 350 * time.Millisecond
 	continuationLongDur   = 700 * time.Millisecond // 「ー」で伸ばす音
 	confirmationNoteDur   = 120 * time.Millisecond // 「テレレレレ」の確認音は短く刻む
+
+	// SongOfTimePauseDur は、確認音(SongOfTimeConfirmation)が鳴り終わって
+	// から曲の続き(SongOfTimeContinuation)が始まるまでの間(1拍分)。
+	SongOfTimePauseDur = continuationNormalDur
 )
 
 // SongOfTimeConfirmation は、プレイヤーがSongOfTimeName(前半6音)を正しく
 // 演奏した直後に鳴る、本家のゼルダのような短い確認音(「テレレレレ」)。
-// オクターブ指定が無いため、続きのメロディ(SongOfTimeContinuation)に
-// 近い5オクターブで統一している。
-// ソ₅→ファ#₅→レ#₅→ラ₅→ソ#₅→ミ₅→ソ#₅→ド₅
+// オクターブ指定が無いため、続きのメロディ(SongOfTimeContinuation)より
+// 2オクターブ高い7オクターブで鳴らしている。
+// ソ₇→ファ#₇→レ#₇→ラ₇→ソ#₇→ミ₇→ソ#₇→ド₇
 var SongOfTimeConfirmation = []ContinuationNote{
-	{MIDINote: 79, Duration: confirmationNoteDur}, // ソ₅
-	{MIDINote: 78, Duration: confirmationNoteDur}, // ファ#₅
-	{MIDINote: 75, Duration: confirmationNoteDur}, // レ#₅
-	{MIDINote: 81, Duration: confirmationNoteDur}, // ラ₅
-	{MIDINote: 80, Duration: confirmationNoteDur}, // ソ#₅
-	{MIDINote: 76, Duration: confirmationNoteDur}, // ミ₅
-	{MIDINote: 80, Duration: confirmationNoteDur}, // ソ#₅
-	{MIDINote: 72, Duration: confirmationNoteDur}, // ド₅
+	{MIDINote: 103, Duration: confirmationNoteDur}, // ソ₇
+	{MIDINote: 102, Duration: confirmationNoteDur}, // ファ#₇
+	{MIDINote: 99, Duration: confirmationNoteDur},  // レ#₇
+	{MIDINote: 105, Duration: confirmationNoteDur}, // ラ₇
+	{MIDINote: 104, Duration: confirmationNoteDur}, // ソ#₇
+	{MIDINote: 100, Duration: confirmationNoteDur}, // ミ₇
+	{MIDINote: 104, Duration: confirmationNoteDur}, // ソ#₇
+	{MIDINote: 96, Duration: confirmationNoteDur},  // ド₇
 }
 
 // SongOfTimeContinuation は、プレイヤーがSongOfTimeName(前半6音)を正しく
