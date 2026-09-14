@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"syscall/js"
 
+	"github.com/Kan-O435/okarina/internal/game"
 	"github.com/Kan-O435/okarina/internal/midi"
 )
 
@@ -45,6 +46,7 @@ func goOnMIDIEvent(this js.Value, args []js.Value) interface{} {
 		Timestamp: args[3].Float(),
 	}
 	midi.HandleEvent(event)
+	game.OnMIDIEvent(event)
 	CallConsoleLog(fmt.Sprintf("bridge: MIDI event forwarded to Go: %+v", event))
 	return nil
 }
