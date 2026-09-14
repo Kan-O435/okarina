@@ -6,6 +6,7 @@ import (
 
 	"github.com/Kan-O435/okarina/internal/bridge"
 	"github.com/Kan-O435/okarina/internal/game"
+	"github.com/Kan-O435/okarina/internal/renderer"
 )
 
 func main() {
@@ -18,6 +19,25 @@ func main() {
 	// 関数を登録してからプログラムを常駐させる。
 	if runtime.GOOS == "js" {
 		bridge.Init()
+
+		ctx, err := renderer.NewContext("game-canvas")
+		if err != nil {
+			fmt.Println("renderer: failed to initialize:", err)
+		} else {
+			width, height := ctx.CanvasSize()
+			ctx.Viewport(width, height)
+			ctx.EnableDepthTest()
+			ctx.ClearColor(0.53, 0.75, 0.9, 1.0) // 空っぽい水色
+
+			scene, err := renderer.BuildFieldDemoScene(ctx)
+			if err != nil {
+				fmt.Println("renderer: failed to build demo scene:", err)
+			} else {
+				scene.Render(ctx)
+				fmt.Println("renderer: demo scene rendered (ground + link placeholder)")
+			}
+		}
+
 		select {}
 	}
 }
