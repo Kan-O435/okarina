@@ -48,10 +48,12 @@ const (
 
 // BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール・階段+
 // 建物/塔/扉のプレースホルダー)を配置したSceneを組み立てる。
-func BuildFieldDemoScene(c *Context) (*Scene, error) {
+// 戻り値のlinkIndexは、scene.ObjectsのうちLinkに対応する要素のインデックス
+// (プレイヤー移動に合わせて呼び出し側がTransformを書き換えるために使う)。
+func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, err error) {
 	program, err := c.NewProgram(basicVertexShaderSrc, basicFragmentShaderSrc)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 
 	width, height := c.CanvasSize()
@@ -74,21 +76,22 @@ func BuildFieldDemoScene(c *Context) (*Scene, error) {
 
 	templeBody, err := templeBodyObject(c)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	objects = append(objects, templeBody)
 
 	link, err := linkObject(c)
 	if err != nil {
-		return nil, err
+		return nil, -1, err
 	}
 	objects = append(objects, link)
+	linkIndex = len(objects) - 1
 
 	return &Scene{
 		Program:        program,
 		ViewProjection: projection.Mul(view),
 		Objects:        objects,
-	}, nil
+	}, linkIndex, nil
 }
 
 func groundObject(c *Context) Object {

@@ -60,3 +60,40 @@ h3 {
   overflow-y: auto;
   min-width: 260px;
 }
+#mic-pitch-status {
+  font-size: 12px;
+  color: #aaa;
+}
+#btn-start-mic-pitch {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+#mic-pitch-info {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin-top: 8px;
+  font-size: 16px;
+}
+#mic-direction {
+  color: #7CFC9A;
+  font-size: 13px;
+}
+#mic-threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+}
+#mic-threshold-value {
+  color: #aaa;
+  min-width: 48px;
+}
