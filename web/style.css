@@ -101,3 +101,27 @@ h3 {
   font-size: 12px;
   color: #aaa;
 }
+#ganon-variant-controls {
+  display: flex;
+  gap: 8px;
+}
+#ganon-variant-controls button {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#ganon-variant-controls button.variant-active {
+  background: #7CFC9A;
+  color: #111;
+  border-color: #7CFC9A;
+  font-weight: bold;
+}
+#ganon-variant-status {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 6px;
+}
