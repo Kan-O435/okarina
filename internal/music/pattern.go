@@ -37,12 +37,12 @@ const (
 
 // SongOfTimeContinuation は、プレイヤーがSongOfTimeName(前半6音)を正しく
 // 演奏した後、本家のゼルダのように続けて自動再生される「時の歌」の後半部分。
-// ラ₅→ド₆→シ₅ー→ソ₅→ファ₅→ソ₅→ラ₅ー｜レ₆→ド₆→ミ₆→レ₆ー
+// ラ₅→ド₆→シ₅ー→ソ₅ー→ファ₅→ソ₅→ラ₅ー｜レ₆→ド₆→ミ₆→レ₆ー
 var SongOfTimeContinuation = []ContinuationNote{
 	{MIDINote: 81, Duration: continuationNormalDur}, // ラ₅
 	{MIDINote: 84, Duration: continuationNormalDur}, // ド₆
 	{MIDINote: 83, Duration: continuationLongDur},   // シ₅ー
-	{MIDINote: 79, Duration: continuationNormalDur}, // ソ₅
+	{MIDINote: 79, Duration: continuationLongDur},   // ソ₅ー
 	{MIDINote: 77, Duration: continuationNormalDur}, // ファ₅
 	{MIDINote: 79, Duration: continuationNormalDur}, // ソ₅
 	{MIDINote: 81, Duration: continuationLongDur},   // ラ₅ー
