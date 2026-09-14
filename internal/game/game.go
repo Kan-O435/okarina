@@ -17,6 +17,14 @@ import (
 // 終わったとみなす無音時間。
 const melodyIdleTimeout = 2 * time.Second
 
+// doorMelodyName は、隠し扉を開くメロディに対応するmusic.Patternの名前
+// (internal/music/pattern.goのDefaultPatterns参照)。
+const doorMelodyName = "DOOR_MELODY"
+
+// doorOpenDelay は、扉のメロディが認識されてから実際に扉が開き始めるまでの
+// 「ため」の時間。
+const doorOpenDelay = 7 * time.Second
+
 var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
 // Run はゲームのエントリーポイント。
@@ -146,13 +154,20 @@ func OnMIDIEvent(e midi.Event) {
 }
 
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
-// 登録済みの旋律パターンと照合する。
+// 登録済みの旋律パターンと照合する。扉のメロディ(doorMelodyName)が
+// 認識できた場合は、doorOpenDelayだけ待ってから扉を開く。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
-	if name := music.Recognize(melody, music.DefaultPatterns); name != "" {
-		fmt.Printf("[music] recognized: %s\n", name)
-	} else {
+	name := music.Recognize(melody, music.DefaultPatterns)
+	if name == "" {
 		fmt.Println("[music] recognized: (no match)")
+		return
+	}
+	fmt.Printf("[music] recognized: %s\n", name)
+
+	if name == doorMelodyName {
+		fmt.Printf("[music] %s recognized, opening door in %s\n", doorMelodyName, doorOpenDelay)
+		time.AfterFunc(doorOpenDelay, OpenDoor)
 	}
 }
