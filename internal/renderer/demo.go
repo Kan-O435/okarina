@@ -58,15 +58,29 @@ const (
 // doorOpenAngleRad は扉が全開(progress=1)になったときの回転角。
 var doorOpenAngleRad = vecmath.Radians(100)
 
+// LinkPlacement は、呼び出し側(ゲームループ)がLinkの位置・向きを毎フレーム
+// 書き換えるために必要な情報をまとめたもの。
+type LinkPlacement struct {
+	// Index は、scene.ObjectsのうちLinkに対応する要素のインデックス。
+	Index int
+	// LocalTransform は、ワールド上の位置・向きを一切含まない、Link自身の
+	// 原点(足元・中心)を基準にした変換(スケール+モデル原点補正のみ)。
+	// 毎フレーム Translate(worldPos).Mul(RotateY(yaw)).Mul(LocalTransform) の
+	// ように組み立て直すことで、位置と向きを独立に更新できる。
+	LocalTransform vecmath.Mat4
+	// SpawnZ はLinkの初期スポーン位置(Z座標)。
+	SpawnZ float64
+}
+
 // BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール・階段+
 // 建物/塔/扉のプレースホルダー)を配置したSceneを組み立てる。
-// 戻り値のlinkIndexはLinkに対応するObjectのインデックス(プレイヤー移動に
-// 合わせて呼び出し側がTransformを書き換えるために使う)、doorIndexは扉
-// Objectのインデックス(毎フレーム扉のTransformを更新するために使う)。
-func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int, err error) {
+// 戻り値のLinkPlacementは、プレイヤー移動に合わせて呼び出し側がLinkの
+// Transformを書き換えるために使う。doorIndexは扉Objectのインデックス
+// (毎フレーム扉のTransformを更新するために使う)。
+func BuildFieldDemoScene(c *Context) (scene *Scene, link LinkPlacement, doorIndex int, err error) {
 	program, err := c.NewProgram(basicVertexShaderSrc, basicFragmentShaderSrc)
 	if err != nil {
-		return nil, -1, -1, err
+		return nil, LinkPlacement{}, -1, err
 	}
 
 	width, height := c.CanvasSize()
@@ -88,20 +102,24 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int
 
 	templeBody, err := templeBodyObject(c)
 	if err != nil {
-		return nil, -1, -1, err
+		return nil, LinkPlacement{}, -1, err
 	}
 	objects = append(objects, templeBody)
 
-	link, err := linkObject(c)
+	linkObj, linkLocal, err := linkObject(c)
 	if err != nil {
-		return nil, -1, -1, err
+		return nil, LinkPlacement{}, -1, err
 	}
-	objects = append(objects, link)
-	linkIndex = len(objects) - 1
+	objects = append(objects, linkObj)
+	link = LinkPlacement{
+		Index:          len(objects) - 1,
+		LocalTransform: linkLocal,
+		SpawnZ:         linkSpawnZ,
+	}
 
 	trees, err := treeObjects(c)
 	if err != nil {
-		return nil, -1, -1, err
+		return nil, LinkPlacement{}, -1, err
 	}
 	objects = append(objects, trees...)
 
@@ -112,7 +130,7 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int
 	doorIndex = len(objects)
 	door, err := doorObject(c)
 	if err != nil {
-		return nil, -1, -1, err
+		return nil, LinkPlacement{}, -1, err
 	}
 	objects = append(objects, door)
 
@@ -120,7 +138,7 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, linkIndex int, doorIndex int
 		Program:        program,
 		ViewProjection: projection.Mul(view),
 		Objects:        objects,
-	}, linkIndex, doorIndex, nil
+	}, link, doorIndex, nil
 }
 
 func groundObject(c *Context) Object {
@@ -212,14 +230,20 @@ func DoorTransform(progress float64) vecmath.Mat4 {
 // 立つよう配置する。体パーツごとに分かれた複数メッシュを結合して1体として
 // 表示するため LoadSkinnedGLBMesh を使う。アニメーション(Idle/Walking等)は
 // GLB内に含まれているが、スキニングは未実装のため現状は静止表示のみ。
-func linkObject(c *Context) (Object, error) {
+//
+// 戻り値のlocalTransformは、ワールド座標(0, 0)に置いた場合の変換
+// (=スケール+モデル原点補正のみ)で、呼び出し側が毎フレーム位置・向きを
+// 更新する際の土台として使う。
+func linkObject(c *Context) (obj Object, localTransform vecmath.Mat4, err error) {
 	model, err := c.LoadSkinnedGLBMesh(assets.LinkKnight)
 	if err != nil {
-		return Object{}, err
+		return Object{}, vecmath.Mat4{}, err
 	}
 
-	transform := model.GroundTransform(0, linkSpawnZ, linkTargetHeight)
-	return Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}, nil
+	localTransform = model.GroundTransform(0, 0, linkTargetHeight)
+	transform := vecmath.Translate(vecmath.NewVec3(0, 0, linkSpawnZ)).Mul(localTransform)
+	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}
+	return obj, localTransform, nil
 }
 
 // treePlacement は1本の木の配置(中心のXZ座標と目標の高さ)を表す。
