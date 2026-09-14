@@ -31,7 +31,45 @@ go run ./cmd/game
 
 `Game initialized` と `game.Run() called` がコンソールに表示されれば正常。
 
+## 動作確認 (ブラウザ / WASM)
+
+### 1. WASMビルド
+
+```bash
+GOOS=js GOARCH=wasm go build -o web/game.wasm ./cmd/game
+```
+
+### 2. wasm_exec.js の配置(Goのバージョンを上げた時などは再実行)
+
+```bash
+cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/wasm_exec.js
+```
+
+### 3. ローカルサーバーで配信
+
+`fetch()` で `.wasm` を読み込むため、`file://` では動かない。
+`web/` 直下でHTTPサーバーを立てる。
+
+```bash
+cd web
+python3 -m http.server 8000
+```
+
+### 4. ブラウザで確認
+
+`http://localhost:8000/index.html` を開き、DevToolsのConsoleに
+
+```
+Game initialized
+game.Run() called
+```
+
+が表示されればOK。
+
 ## 今後の予定
 
-- [ ] #2: GoをWASMとして実行できるようにする
-- [ ] #3: GoとJavaScript間のBridgeを作成する(MIDIイベントをGoへ渡す)
+- [x] #1: Goプロジェクトを作成する
+- [x] #2: GoをWASMとして実行できるようにする
+- [ ] #4: MIDIデバイスを検出する
+- [ ] #5: MIDI Note ON/OFFを取得する
+- [ ] #6: MIDIイベントをGoへ渡す

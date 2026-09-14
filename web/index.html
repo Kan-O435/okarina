@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Okarina</title>
+<style>
+  body {
+    margin: 0;
+    background: #111;
+    color: #eee;
+    font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  #status {
+    font-size: 14px;
+    color: #7CFC9A;
+    margin-bottom: 12px;
+  }
+  #status.error { color: #ff8080; }
+  canvas {
+    background: #000;
+    border: 1px solid #333;
+  }
+</style>
+</head>
+<body>
+
+<div id="status">Go WASM を読み込み中...</div>
+<canvas id="game-canvas" width="800" height="600"></canvas>
+
+<script src="wasm_exec.js"></script>
+<script>
+  const statusEl = document.getElementById('status');
+
+  if (!WebAssembly) {
+    statusEl.textContent = "このブラウザはWebAssemblyに対応していません";
+    statusEl.className = "error";
+  } else {
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("game.wasm"), go.importObject)
+      .then((result) => {
+        statusEl.textContent = "Go WASM 起動完了 (Consoleを確認してください)";
+        go.run(result.instance);
+      })
+      .catch((err) => {
+        statusEl.textContent = "WASMのロードに失敗しました: " + err;
+        statusEl.className = "error";
+        console.error(err);
+      });
+  }
+</script>
+
+</body>
+</html>
