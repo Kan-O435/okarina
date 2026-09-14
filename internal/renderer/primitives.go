@@ -43,6 +43,18 @@ func verticalQuadVertices(halfWidth, height float32) []float32 {
 	}
 }
 
+// centeredQuadVertices はXY平面上に立てた、原点を中心とする板の頂点を返す。
+// 後光(halo)のような、地面ではなく空中の一点を中心に置きたいオブジェクトに
+// 使う(verticalQuadVerticesは足元Y=0を基準にする点が異なる)。
+func centeredQuadVertices(halfWidth, halfHeight float32) []float32 {
+	return []float32{
+		-halfWidth, -halfHeight, 0,
+		halfWidth, -halfHeight, 0,
+		halfWidth, halfHeight, 0,
+		-halfWidth, halfHeight, 0,
+	}
+}
+
 // quadVertices はXZ平面上、高さyに配置した矩形(中心がX/Z原点)の頂点を返す。
 // 地面・道・プールなど、水平に置くオブジェクトに使う。
 func quadVertices(halfWidth, halfDepth, y float32) []float32 {
