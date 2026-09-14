@@ -11,11 +11,30 @@
 <canvas id="game-canvas" width="800" height="600"></canvas>
 
 <p style="font-size: 13px; color: #aaa;">
-  草原フィールドはまだ地面のみの最小構成です。中身は今後追加していきます。<br>
+  草原フィールドはまだ地面と道のみの最小構成です。中身は今後追加していきます。<br>
   <a href="index.html" style="color: #7CFC9A;">神殿フィールドに戻る</a>
 </p>
 
+<h3>オタマトーンでLinkを移動</h3>
+<div id="mic-pitch-status">マイクは未接続です</div>
+<button id="btn-start-mic-pitch">マイクを開始</button>
+<div id="mic-pitch-info">
+  <span id="mic-pitch-value">-- Hz</span>
+  <span id="mic-direction">停止</span>
+</div>
+<div id="mic-threshold-row">
+  <label for="mic-threshold-slider">しきい値</label>
+  <input type="range" id="mic-threshold-slider" min="-60" max="-10" value="-30" step="1">
+  <span id="mic-threshold-value">-30 dB</span>
+</div>
+
+<h3>デバッグ操作</h3>
+<div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
+
 <script src="wasm_exec.js"></script>
+<script src="pitch.js"></script>
+<script src="mic-pitch.js"></script>
+<script src="debug-keys.js"></script>
 <script src="grassland.js"></script>
 
 </body>
