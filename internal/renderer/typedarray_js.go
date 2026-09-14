@@ -31,6 +31,15 @@ func uint16ArrayOf(data []uint16) js.Value {
 	return typedArrayFromBytes(buf, "Uint16Array")
 }
 
+// uint8ArrayOf はGoの[]byteをJS側のUint8Arrayに変換する。
+// テクスチャ画像バイナリ等、要素のバイト幅変換が不要なデータをそのまま
+// JSへ渡す際に使う。
+func uint8ArrayOf(data []byte) js.Value {
+	arr := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(arr, data)
+	return arr
+}
+
 func typedArrayFromBytes(buf []byte, jsTypedArrayName string) js.Value {
 	uint8Array := js.Global().Get("Uint8Array").New(len(buf))
 	js.CopyBytesToJS(uint8Array, buf)

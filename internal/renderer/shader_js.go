@@ -78,3 +78,10 @@ func (p *Program) SetUniformVec3(c *Context, name string, v vecmath.Vec3) {
 	loc := c.gl.Call("getUniformLocation", p.handle, name)
 	c.gl.Call("uniform3f", loc, v.X, v.Y, v.Z)
 }
+
+// SetUniformSampler はsampler2D型のuniform変数に、バインド先のテクスチャ
+// ユニット番号(gl.TEXTURE0からのオフセット)を設定する。Use済みであること。
+func (p *Program) SetUniformSampler(c *Context, name string, textureUnit int) {
+	loc := c.gl.Call("getUniformLocation", p.handle, name)
+	c.gl.Call("uniform1i", loc, textureUnit)
+}

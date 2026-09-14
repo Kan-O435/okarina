@@ -18,8 +18,9 @@ const (
 // Context は取得済みのWebGL1レンダリングコンテキストをラップする。
 // 今後のシェーダー・メッシュ描画は、このContextを起点に実装していく。
 type Context struct {
-	canvas js.Value
-	gl     js.Value
+	canvas       js.Value
+	gl           js.Value
+	whiteTexture *Texture // WhiteTexture()で遅延生成してキャッシュする
 }
 
 // NewContext はDOM上のcanvas要素(id指定)からWebGL1コンテキストを取得する。

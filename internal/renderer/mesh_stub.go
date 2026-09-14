@@ -6,7 +6,7 @@ package renderer
 type Mesh struct{}
 
 // NewMesh はネイティブビルドでは何もしない空のMeshを返す。
-func (c *Context) NewMesh(positions []float32, indices []uint16) *Mesh {
+func (c *Context) NewMesh(positions, texcoords []float32, indices []uint16) *Mesh {
 	return &Mesh{}
 }
 
