@@ -9,7 +9,6 @@ import (
 	"github.com/Kan-O435/okarina/internal/music"
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
-	"github.com/Kan-O435/okarina/internal/vecmath"
 	"github.com/Kan-O435/okarina/internal/world"
 )
 
@@ -87,9 +86,7 @@ func (g *Game) Update(dt float64) {
 
 	deltaZ := player.Player.Update(dt)
 	if deltaZ != 0 {
-		worldPos := vecmath.Translate(vecmath.NewVec3(0, 0, player.Player.Z))
-		facing := vecmath.RotateY(player.Player.Yaw)
-		g.scene.Objects[g.link.Index].Transform = worldPos.Mul(facing).Mul(g.link.LocalTransform)
+		g.scene.Objects[g.link.Index].Transform = player.Player.Transform(g.link.LocalTransform)
 	}
 
 	if g.autoWalking && !g.transitioned && player.Player.Z <= renderer.DoorPassThroughZ {
