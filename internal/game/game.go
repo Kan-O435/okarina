@@ -3,6 +3,7 @@ package game
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Kan-O435/okarina/internal/midi"
@@ -124,8 +125,41 @@ func SongOfTimePlayed() bool {
 	return songOfTimePlayed
 }
 
+// audioHooksMu は、下のplayNoteHook・stopNoteHook・sleepHookへの読み書きを
+// 保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の続きを再生する
+// ため、bridge.Init()での差し込みやテストでの差し替えと同時に読まれても
+// 安全なようにしている。
+var audioHooksMu sync.Mutex
+
+// playNoteHook・stopNoteHook は、Goから直接ブラウザの音声再生(Web Audio
+// API、web/audio.jsのplayNote/stopNote)を呼び出すためのフック。
+// bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未初期化時は
+// nilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
+var (
+	playNoteHook func(note, velocity int)
+	stopNoteHook func(note int)
+	sleepHook    = time.Sleep
+)
+
+// SetPlayNoteFunc は、Goから曲を自動再生する際に使う「1音鳴らす」実装を
+// 登録する(bridge.Init()から呼ばれる)。
+func SetPlayNoteFunc(f func(note, velocity int)) {
+	audioHooksMu.Lock()
+	playNoteHook = f
+	audioHooksMu.Unlock()
+}
+
+// SetStopNoteFunc は、Goから曲を自動再生する際に使う「1音止める」実装を
+// 登録する(bridge.Init()から呼ばれる)。
+func SetStopNoteFunc(f func(note int)) {
+	audioHooksMu.Lock()
+	stopNoteHook = f
+	audioHooksMu.Unlock()
+}
+
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
-// 登録済みの旋律パターンと照合する。時の歌が演奏された場合は隠し扉を開く。
+// 登録済みの旋律パターンと照合する。時の歌が演奏された場合は隠し扉を開き、
+// 本家のゼルダのように曲の続き(SongOfTimeContinuation)を自動再生する。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -140,5 +174,24 @@ func onMelodyRecorded(melody music.Melody) {
 		songOfTimePlayed = true
 		fmt.Println("[music] 時の歌が演奏されました。隠し扉が開きます。")
 		OpenDoor()
+		go playSongOfTimeContinuation()
+	}
+}
+
+// playSongOfTimeContinuation は、プレイヤーが演奏した合図に続けて、時の歌の
+// 後半部分(music.SongOfTimeContinuation)を自動再生する。再生用フックが
+// 未登録(ネイティブビルドやJS未初期化時)の場合は何もしない。
+func playSongOfTimeContinuation() {
+	audioHooksMu.Lock()
+	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
+	audioHooksMu.Unlock()
+
+	if play == nil || stop == nil {
+		return
+	}
+	for _, n := range music.SongOfTimeContinuation {
+		play(n.MIDINote, 100)
+		sleep(n.Duration)
+		stop(n.MIDINote)
 	}
 }
