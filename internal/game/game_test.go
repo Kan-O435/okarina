@@ -88,7 +88,8 @@ func TestPlaySongOfTimeAudio_PlaysConfirmationThenContinuation(t *testing.T) {
 
 	playSongOfTimeAudio()
 
-	want := append(append([]music.ContinuationNote{}, music.SongOfTimeConfirmation...), music.SongOfTimeContinuation...)
+	want := append(append([]music.ContinuationNote{}, music.SongOfTimeConfirmation...), music.SongOfTimeOpening...)
+	want = append(want, music.SongOfTimeContinuation...)
 	if len(played) != len(want) {
 		t.Fatalf("played %d notes, want %d", len(played), len(want))
 	}
@@ -106,7 +107,7 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 	songOfTimePlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
 
-	wantTotal := len(music.SongOfTimeConfirmation) + len(music.SongOfTimeContinuation)
+	wantTotal := len(music.SongOfTimeConfirmation) + len(music.SongOfTimeOpening) + len(music.SongOfTimeContinuation)
 
 	done := make(chan struct{})
 	var mu sync.Mutex

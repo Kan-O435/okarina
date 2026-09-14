@@ -180,8 +180,9 @@ func onMelodyRecorded(melody music.Melody) {
 }
 
 // playSongOfTimeAudio は、プレイヤーが演奏した合図に続けて、確認音
-// (music.SongOfTimeConfirmation)→曲の後半部分(music.SongOfTimeContinuation)
-// の順に自動再生する。再生用フックが未登録(ネイティブビルドやJS未初期化時)
+// (music.SongOfTimeConfirmation)を鳴らした後、本家のゼルダのように
+// 曲を最初から(music.SongOfTimeOpening→music.SongOfTimeContinuation)
+// 通して自動再生する。再生用フックが未登録(ネイティブビルドやJS未初期化時)
 // の場合は何もしない。
 func playSongOfTimeAudio() {
 	audioHooksMu.Lock()
@@ -193,6 +194,7 @@ func playSongOfTimeAudio() {
 	}
 	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
 	sleep(music.SongOfTimePauseDur)
+	playNotes(play, stop, sleep, music.SongOfTimeOpening)
 	playNotes(play, stop, sleep, music.SongOfTimeContinuation)
 }
 

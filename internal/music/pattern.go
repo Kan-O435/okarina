@@ -56,8 +56,23 @@ var SongOfTimeConfirmation = []ContinuationNote{
 	{MIDINote: 84, Duration: confirmationNoteDur}, // ド₆
 }
 
-// SongOfTimeContinuation は、プレイヤーがSongOfTimeName(前半6音)を正しく
-// 演奏した後、本家のゼルダのように続けて自動再生される「時の歌」の後半部分。
+// SongOfTimeOpening は、確認音(SongOfTimeConfirmation)の後に自動再生する
+// 「時の歌」の冒頭部分(=SongOfTimeNameのPitchesと同じ音: ラ→レ→ファ→ラ→
+// レ→ファ)を、実際に鳴らすためのMIDIノート番号・長さ付きで表したもの。
+// 本家のゼルダは確認音の後に曲を最初から(プレイヤーが演奏した部分も
+// 含めて)通して流すため、SongOfTimeContinuationの前にこれを鳴らす。
+// ラ₅→レ₅ー→ファ₅→ラ₅→レ₅ー→ファ₅ー
+var SongOfTimeOpening = []ContinuationNote{
+	{MIDINote: 81, Duration: continuationNormalDur}, // ラ₅
+	{MIDINote: 74, Duration: continuationLongDur},   // レ₅ー
+	{MIDINote: 77, Duration: continuationNormalDur}, // ファ₅
+	{MIDINote: 81, Duration: continuationNormalDur}, // ラ₅
+	{MIDINote: 74, Duration: continuationLongDur},   // レ₅ー
+	{MIDINote: 77, Duration: continuationLongDur},   // ファ₅ー
+}
+
+// SongOfTimeContinuation は、SongOfTimeOpeningに続けて自動再生される
+// 「時の歌」の後半部分。
 // ラ₅→ド₆→シ₅ー→ソ₅ー→ファ₅→ソ₅→ラ₅ー｜レ₆→ド₆→ミ₆→レ₆ー
 var SongOfTimeContinuation = []ContinuationNote{
 	{MIDINote: 81, Duration: continuationNormalDur}, // ラ₅
