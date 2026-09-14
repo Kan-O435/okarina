@@ -22,8 +22,8 @@ const melodyIdleTimeout = 2 * time.Second
 const doorMelodyName = "DOOR_MELODY"
 
 // doorOpenDelay は、扉のメロディが認識されてから実際に扉が開き始めるまでの
-// 「ため」の時間。
-const doorOpenDelay = 7 * time.Second
+// 「ため」の時間。varにしているのはテストから短く差し替えられるようにするため。
+var doorOpenDelay = 7 * time.Second
 
 var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
@@ -153,9 +153,19 @@ func OnMIDIEvent(e midi.Event) {
 	recorder.HandleEvent(e)
 }
 
-// onMelodyRecorded は一連の演奏が確定した際に呼ばれ、
-// 登録済みの旋律パターンと照合する。扉のメロディ(doorMelodyName)が
-// 認識できた場合は、doorOpenDelayだけ待ってから扉を開く。
+// songOfTimePlayed は、時の歌(music.SongOfTimeName)が正しく演奏された
+// ことを示す。
+var songOfTimePlayed bool
+
+// SongOfTimePlayed は、時の歌が正しく演奏されたかどうかを返す。
+func SongOfTimePlayed() bool {
+	return songOfTimePlayed
+}
+
+// onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律
+// パターンと照合する。扉のメロディ(DOOR_MELODY)または時の歌
+// (music.SongOfTimeName)が演奏された場合、doorOpenDelayだけ「ため」て
+// から隠し扉を開く。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -166,8 +176,12 @@ func onMelodyRecorded(melody music.Melody) {
 	}
 	fmt.Printf("[music] recognized: %s\n", name)
 
-	if name == doorMelodyName {
-		fmt.Printf("[music] %s recognized, opening door in %s\n", doorMelodyName, doorOpenDelay)
+	if name == music.SongOfTimeName {
+		songOfTimePlayed = true
+	}
+
+	if name == doorMelodyName || name == music.SongOfTimeName {
+		fmt.Printf("[music] %s recognized, opening door in %s\n", name, doorOpenDelay)
 		time.AfterFunc(doorOpenDelay, OpenDoor)
 	}
 }

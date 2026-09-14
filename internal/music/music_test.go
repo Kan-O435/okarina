@@ -30,3 +30,22 @@ func TestRecognize(t *testing.T) {
 		t.Errorf("Recognize() = %q, want no match", name)
 	}
 }
+
+func TestRecognize_SongOfTime(t *testing.T) {
+	// 時の歌: ラ→レ→ファ→ラ→レ→ファ
+	melody := Melody{
+		{Pitch: A}, {Pitch: D}, {Pitch: F},
+		{Pitch: A}, {Pitch: D}, {Pitch: F},
+	}
+	if name := Recognize(melody, DefaultPatterns); name != SongOfTimeName {
+		t.Errorf("Recognize() = %q, want %s", name, SongOfTimeName)
+	}
+
+	wrongOrder := Melody{
+		{Pitch: D}, {Pitch: A}, {Pitch: F},
+		{Pitch: A}, {Pitch: D}, {Pitch: F},
+	}
+	if name := Recognize(wrongOrder, DefaultPatterns); name != "" {
+		t.Errorf("Recognize() = %q, want no match for wrong order", name)
+	}
+}
