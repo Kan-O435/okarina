@@ -1,0 +1,16 @@
+Ultimate Animated Animal Pack (Horse)
+
+Created/distributed by: Quaternius (quaternius.com)
+Source: https://quaternius.com/packs/ultimateanimatedanimals.html
+Mirror (preview only, same author/license): https://poly.pizza/m/F8HAAcLeBL
+
+License: Creative Commons CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Free to use in personal, educational, and commercial projects.
+No attribution required (credit appreciated but not mandatory).
+
+Used in this project as: docs/assets/horse/horse.glb
+(converted from the distributed single-file glTF with an embedded
+base64 buffer into a standard binary .glb container; no geometry,
+materials, or animation data were modified)
