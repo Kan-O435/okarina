@@ -5,13 +5,40 @@ const micStatusEl = document.getElementById('mic-status');
 const btnStartMic = document.getElementById('btn-start-mic');
 const pitchDisplayEl = document.getElementById('pitch-display');
 const noteDisplayEl = document.getElementById('note-display');
+const volumeDisplayEl = document.getElementById('volume-display');
+const volumeMeterEl = document.getElementById('volume-meter');
+const thresholdSlider = document.getElementById('threshold-slider');
+const thresholdValueEl = document.getElementById('threshold-value');
 
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+// メーター表示に使う音量の範囲(dB)。この範囲外は振り切れとして扱う。
+const METER_MIN_DB = -60;
+const METER_MAX_DB = 0;
+
 let audioCtx = null;
 let analyser = null;
 let buffer = null;
+
+thresholdValueEl.textContent = thresholdSlider.value + ' dB';
+thresholdSlider.addEventListener('input', () => {
+  thresholdValueEl.textContent = thresholdSlider.value + ' dB';
+});
+
+// computeRMS は波形データの実効値(音量の大きさ)を計算する。
+function computeRMS(buf) {
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) {
+    sum += buf[i] * buf[i];
+  }
+  return Math.sqrt(sum / buf.length);
+}
+
+// rmsToDb はRMSをデシベルに変換する(0dB = 振幅1相当、値が小さいほど負に大きくなる)。
+function rmsToDb(rms) {
+  return 20 * Math.log10(Math.max(rms, 1e-8));
+}
 
 function frequencyToNoteName(freq) {
   const noteNumber = 12 * Math.log2(freq / 440) + 69;
@@ -21,18 +48,10 @@ function frequencyToNoteName(freq) {
   return name + octave;
 }
 
-// 自己相関法で波形の基本周波数(ピッチ)を推定する。無音とみなせる場合は-1を返す。
+// 自己相関法で波形の基本周波数(ピッチ)を推定する。
+// 音量による足切り(音量が小さければ無視する)は呼び出し側(update)で行う。
 function detectPitch(buf, sampleRate) {
   const size = buf.length;
-
-  let rms = 0;
-  for (let i = 0; i < size; i++) {
-    rms += buf[i] * buf[i];
-  }
-  rms = Math.sqrt(rms / size);
-  if (rms < 0.01) {
-    return -1;
-  }
 
   // 振幅が閾値を下回る位置で波形の前後をトリムし、無音部分の影響を減らす。
   const threshold = 0.2;
@@ -99,6 +118,26 @@ function detectPitch(buf, sampleRate) {
 
 function update() {
   analyser.getFloatTimeDomainData(buffer);
+
+  const rms = computeRMS(buffer);
+  const db = rmsToDb(rms);
+  const thresholdDb = Number(thresholdSlider.value);
+
+  volumeDisplayEl.textContent = db.toFixed(1) + ' dB';
+  const meterPercent = Math.min(
+    Math.max((db - METER_MIN_DB) / (METER_MAX_DB - METER_MIN_DB), 0),
+    1
+  ) * 100;
+  volumeMeterEl.style.width = meterPercent + '%';
+  volumeMeterEl.classList.toggle('above-threshold', db >= thresholdDb);
+
+  if (db < thresholdDb) {
+    pitchDisplayEl.textContent = '-- Hz';
+    noteDisplayEl.textContent = '(音量が小さいため無視)';
+    requestAnimationFrame(update);
+    return;
+  }
+
   const freq = detectPitch(buffer, audioCtx.sampleRate);
 
   if (freq > 0 && freq < 5000) {
