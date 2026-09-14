@@ -23,6 +23,11 @@ const grasslandPathHalfWidth = 1.8
 // (カメラに近い側、画面下寄り)に立たせておく位置。
 const grasslandLinkZ = 3.5
 
+// GrasslandTreeTriggerZ は、Linkが右奥の木(grasslandTreeObjectsの
+// X:16, Z:-25の木)のあたりまで進んだら、次のフィールド(ガノン)へ
+// ページ遷移するトリガーとして使うZ座標。
+const GrasslandTreeTriggerZ = -25.0
+
 // grasslandCastleZ/Height は、道の先端(遠景、far=150に収まる範囲でできる
 // だけ奥)に置く白い城(internal/assets.GrasslandCastle)の位置・高さ。
 // 高さ11だと上端の仰角はカメラ中心からおよそ21.5°(垂直画角の半分27.5°の
