@@ -9,7 +9,7 @@ package player
 import "math"
 
 // moveSpeed はワールド単位/秒での移動速度。
-const moveSpeed = 3.0
+const moveSpeed = 8.0
 
 // semitoneDeadZone は「音程が変化した」と判定するための最小変化量(半音)。
 // ピッチ検出のわずかなブレをノイズとして無視するための遊び。
