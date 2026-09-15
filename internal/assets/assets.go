@@ -3,7 +3,7 @@
 // アセット数が増えてきたらHTTP fetch方式への切り替えを検討する。
 package assets
 
-import "embed"
+import _ "embed"
 
 //go:embed models/temple-body.glb
 var TempleBody []byte
@@ -24,38 +24,34 @@ var TempleBody []byte
 //go:embed models/link-knight.glb
 var LinkKnight []byte
 
-// TempleTree は、神殿フィールド専用の木のGLB(Sketchfab「Stylize Tree
-// Lowpoly」、作者: uday、CC Attribution、
+// TempleTree は、神殿・草原フィールド共通で使う木のGLB(Sketchfab
+// 「Stylize Tree Lowpoly」、作者: uday、CC Attribution、
 // https://sketchfab.com/3d-models/stylize-tree-lowpoly-dcf20a5a86784331a34657e94442511f)。
-// 以前使っていたTrees(CC0、Gobkit Nature Kit)より作り込まれた見た目の
-// 単色針葉樹モデルに、この神殿フィールドだけ差し替えている(草原・ガノン
-// フィールドは引き続きTreesを使う)。詳細は
-// docs/licenses/sketchfab-uday-stylize-tree-CC-BY.txt参照。スキンは無く
-// 単一メッシュ+埋め込みテクスチャのため、通常のLoadGLBMeshで読み込む
-// (internal/renderer/demo.goのtreeObjects参照)。
+// 以前使っていたCC0(Gobkit Nature Kit)の木より作り込まれた見た目の
+// 単色針葉樹モデルに、両フィールドとも差し替えている(ガノンフィールドには
+// 木を置いていない)。詳細はdocs/licenses/sketchfab-uday-stylize-tree-CC-BY.txt
+// 参照。スキンは無い単一メッシュだが、Sketchfabのconverted形式でルート
+// ノードに軸補正の変換行列が入っているため、これを焼き込むgltf.ParseParts
+// 経由で読み込む(internal/renderer/demo.goのtreeObjects、grassland.goの
+// grasslandTreeObjects参照。どちらもparts[0]を使う)。
 //
 //go:embed models/temple-tree.glb
 var TempleTree []byte
 
-// TempleCloud は、神殿フィールドの空に浮かべる雲のGLB(Sketchfab
+// TempleCloud は、神殿・草原フィールド共通で空に浮かべる雲のGLB(Sketchfab
 // 「Stylized Clouds Pack - Vol 09」、作者: PolyOne Studio、CC Attribution、
 // https://sketchfab.com/3d-models/stylized-clouds-pack-vol-09-d9c1ff67f80841c6b1d8229dca5495a5)。
 // 16種類のブロック調の雲メッシュが1つのGLBにまとまっており、そのうち
-// いくつかを選んで神殿の上空に手動配置する(internal/renderer/demo.goの
-// templeCloudObjects参照)。スキンは無くパーツごとに別メッシュへ分かれて
-// いるため、GanonBoss等と同じLoadGLBParts/CombinedGroundTransformで
-// 読み込む。詳細はdocs/licenses/sketchfab-polyonestudio-clouds-CC-BY.txt
-// 参照。草原フィールドの雲(CloudTexture、平面の板)とは別物。
+// いくつかを選んで上空に手動配置する(internal/renderer/demo.goの
+// templeCloudObjects、grassland.goのgrasslandTempleCloudObjects参照。
+// 草原フィールドでは、以前使っていたCloudTexture(平面の板)の雲をこちらに
+// 差し替えている。CloudTextureは草原の城の周りのモヤ用として引き続き使う)。
+// スキンは無くパーツごとに別メッシュへ分かれているため、GanonBoss等と
+// 同じLoadGLBParts/CombinedGroundTransformで読み込む。詳細は
+// docs/licenses/sketchfab-polyonestudio-clouds-CC-BY.txt参照。
 //
 //go:embed models/temple-cloud.glb
 var TempleCloud []byte
-
-// Trees は、フィールドに配置する木(CC0、Gobkit Nature Kit)のGLB群。
-// 本数が多いので個別変数ではなくembed.FSでまとめて埋め込む。神殿フィールド
-// はTempleTreeに差し替え済みのため、現在は草原・ガノンフィールドで使う。
-//
-//go:embed models/trees/*.glb
-var Trees embed.FS
 
 // DoorTexture は、隠し扉の見た目に使うテクスチャ画像(CC0、ambientCG Door002の
 // プレビュー画像、扉の外側が透過PNG)。3Dモデル自体はまだ無いため、
@@ -83,11 +79,25 @@ var GrasslandCastle []byte
 //go:embed textures/halo.png
 var HaloTexture []byte
 
-// CloudTexture は、空に浮かべる雲の板に貼るテクスチャ(不定形の白い塊、
-// 外側が透明)。自作の手続き生成画像。色はObject.Colorで紫に着色する。
+// CloudTexture は、柔らかい白い塊(外側が透明)の板に貼る自作の手続き生成
+// テクスチャ。草原フィールドでは、城の周りに軽く漂わせるモヤに使う
+// (internal/renderer/grassland.goのgrasslandSkyObjects参照。城の後光と
+// 同様、Object.Colorで着色する)。以前は同じ板に雲としても使っていたが、
+// 神殿・草原とも雲はTempleCloud(立体的なメッシュ)に差し替えている。
 //
 //go:embed textures/cloud.png
 var CloudTexture []byte
+
+// GrasslandGroundTexture は、草原フィールドの地面に貼る草のテクスチャ
+// (オリーブ〜黄緑〜土色がまだらに混ざった、乾いた草原らしい見た目)。
+// 自作の手続き生成画像(複数スケールのvalue noiseを重ねて生成)。
+// 地面は非常に広い1枚のquad(internal/renderer/grassland.goの
+// grasslandGroundObject参照)にタイリングせずそのまま貼るため、
+// 実際にプレイヤーが動き回る範囲(中心付近)では模様が大きく・
+// ゆるやかに見える。
+//
+//go:embed textures/grassland-ground.png
+var GrasslandGroundTexture []byte
 
 // GanonBattleScene は、ガノンフィールドの背景となる、荒れ果てた戦場跡の
 // ジオラマのGLB(Tripo3Dで生成・リメッシュ・テクスチャ生成済み)。横長・

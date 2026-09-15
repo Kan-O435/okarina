@@ -1,4 +1,3 @@
-const statusEl = document.getElementById('status');
 const bridgeLogEl = document.getElementById('bridge-log');
 const btnPing = document.getElementById('btn-ping');
 const btnMidi = document.getElementById('btn-midi');
@@ -15,13 +14,12 @@ function appendLog(text) {
 // initMIDI/onMIDIMessage等はmidi-input.jsで定義(神殿・草原フィールド共通)。
 
 if (!WebAssembly) {
-  statusEl.textContent = "このブラウザはWebAssemblyに対応していません";
-  statusEl.className = "error";
+  console.error("このブラウザはWebAssemblyに対応していません");
 } else {
   const go = new Go();
   WebAssembly.instantiateStreaming(fetch("game.wasm"), go.importObject)
     .then((result) => {
-      statusEl.textContent = "Go WASM 起動完了 (Consoleを確認してください)";
+      console.log("Go WASM 起動完了");
       go.run(result.instance);
 
       btnPing.disabled = false;
@@ -57,8 +55,6 @@ if (!WebAssembly) {
       initMIDI();
     })
     .catch((err) => {
-      statusEl.textContent = "WASMのロードに失敗しました: " + err;
-      statusEl.className = "error";
-      console.error(err);
+      console.error("WASMのロードに失敗しました:", err);
     });
 }

@@ -12,12 +12,6 @@ body {
   overflow-y: auto;
   padding-bottom: 24px;
 }
-#status {
-  font-size: 14px;
-  color: #7CFC9A;
-  margin-bottom: 12px;
-}
-#status.error { color: #ff8080; }
 canvas {
   background: #000;
 }
