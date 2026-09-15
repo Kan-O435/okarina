@@ -259,37 +259,31 @@ func grasslandLinkObject(c *Context) (obj Object, localTransform vecmath.Mat4, e
 }
 
 // horseTargetHeight は、馬(internal/assets.Horse)をこの高さになるよう
-// スケールする。horseSpawnOffsetXは、呼び出したLinkの隣に立たせるための
-// 横方向のオフセット。
-const (
-	horseTargetHeight = 2.0
-	horseSpawnOffsetX = 2.5
-)
+// スケールする。
+const horseTargetHeight = 2.0
+
+// LinkMountHeight は、馬に乗っているLinkを、馬の背に座っているように見せる
+// ための上方向オフセット(ワールド単位)。アニメーション・スキニングが
+// 未実装のため、専用の騎乗ポーズは組めず、Linkをこの高さだけ持ち上げる
+// 簡易的な表現にとどめている(docs/assets/horse/README.md参照)。
+const LinkMountHeight = 1.3
 
 // BuildHorseObject は、草原フィールドで「馬の歌」が演奏された際にSceneへ
-// 追加する馬のObjectを組み立てる。playerZは呼び出し時点のプレイヤー(Link)の
-// Z座標で、その少し横(X=horseSpawnOffsetX)に馬を配置する。アニメーション・
+// 追加する馬のObjectを組み立てる。Linkと同じ場所(player.Player.Zの位置)に
+// 呼び出し、Linkが馬に乗っているように見せるため。アニメーション・
 // スキニングは未実装のため、静止ポーズでの表示になる
 // (docs/assets/horse/README.md参照)。
 //
 // 戻り値のlocalTransformは、ワールド位置を含まないモデル原点補正+スケール
-// のみの変換で、呼び出し側がHorseTransform()を使って毎回モデルを読み直さず
-// 馬の位置を更新できるようにするためのもの。
-func BuildHorseObject(c *Context, playerZ float64) (obj Object, localTransform vecmath.Mat4, err error) {
+// のみの変換で、呼び出し側が毎フレームplayer.Player.Transform(localTransform)
+// を使って、Linkと同じ位置・向きに馬を追従させるためのもの。
+func BuildHorseObject(c *Context) (obj Object, localTransform vecmath.Mat4, err error) {
 	model, err := c.LoadSkinnedGLBMesh(assets.Horse)
 	if err != nil {
 		return Object{}, vecmath.Mat4{}, err
 	}
 
 	localTransform = model.GroundTransform(0, 0, horseTargetHeight)
-	transform := HorseTransform(playerZ).Mul(localTransform)
-	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}
+	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Color: model.Color}
 	return obj, localTransform, nil
-}
-
-// HorseTransform は、プレイヤー(Link)のZ座標playerZから、馬を配置する
-// ワールド変換(Linkの隣、X=horseSpawnOffsetX)を返す。BuildHorseObjectが
-// 返すlocalTransformと組み合わせて使う。
-func HorseTransform(playerZ float64) vecmath.Mat4 {
-	return vecmath.Translate(vecmath.NewVec3(horseSpawnOffsetX, 0, playerZ))
 }
