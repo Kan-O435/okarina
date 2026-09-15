@@ -46,13 +46,47 @@ const (
 )
 
 // 各段階の長さ(秒)。トドメの演出なので、テンポよく畳みかけるのではなく、
-// じっくり見せる長さにしている。
+// じっくり見せる長さにしている。雷フェーズは、画面全体を覆う複数の雷が
+// 明滅する派手さを出すため0.5→0.9秒に伸ばしている。
 const (
 	ganonBattleDefeatStormingDuration  = 2.5
-	ganonBattleDefeatLightningDuration = 0.5
-	ganonBattleDefeatExplodingDuration = 1.2
+	ganonBattleDefeatLightningDuration = 0.9
+	ganonBattleDefeatExplodingDuration = 1.4
 	ganonBattleDefeatFadingDuration    = 1.2
 )
+
+// ganonBattleLightningFlickers は、雷フェーズ(0〜1に正規化した経過割合)の
+// 間に画面全体を明滅させる閃光の区間一覧。1回の大きな光ではなく、本物の
+// 雷のように何度か立て続けに光らせることで「画面全体に派手に雷が落ちる」
+// 見た目にする。各区間内は三角形状(0→1→0)に立ち上がる。
+var ganonBattleLightningFlickers = [][2]float64{
+	{0.0, 0.18},
+	{0.28, 0.46},
+	{0.6, 0.82},
+}
+
+// ganonBattleLightningFlickerAlpha は、雷フェーズの経過割合tにおける
+// 白閃光オーバーレイの不透明度を返す(ganonBattleLightningFlickers参照)。
+func ganonBattleLightningFlickerAlpha(t float64) float64 {
+	for _, f := range ganonBattleLightningFlickers {
+		start, end := f[0], f[1]
+		if t < start || t > end {
+			continue
+		}
+		mid := (start + end) / 2
+		if t <= mid {
+			return (t - start) / (mid - start)
+		}
+		return 1 - (t-mid)/(end-mid)
+	}
+	return 0
+}
+
+// ganonBattleExplosionFlashDuration は、爆発フェーズの冒頭だけ光る
+// 「ドカン」という閃光の長さ(爆発フェーズ経過割合に対する比率)。この
+// 間だけ白オーバーレイを強く光らせ、その裏でGanon本体を隠すことで
+// 「爆発して消える」を自然に見せる。
+const ganonBattleExplosionFlashFraction = 0.35
 
 // ganonBattleStormSkyColor は、嵐が強まっていく間にClearColorを近づけて
 // いく先の色(暗い暴風雨の空)。フィールド通常時の色(0.15, 0.05, 0.05)から
@@ -106,7 +140,7 @@ func main() {
 		ctx.EnableBlend()                     // 楽譜HUD・嵐雲・煙・白フェードの半透明合成のため
 		ctx.ClearColor(0.15, 0.05, 0.05, 1.0) // 暗く不穏な赤黒い空気
 
-		scene, link, err := renderer.BuildGanonScene(ctx, renderer.GanonBackgroundBattle)
+		scene, bossStart, bossEnd, link, err := renderer.BuildGanonSceneWithBossRange(ctx, renderer.GanonBackgroundBattle)
 		rockParts, rockPartsErr := renderer.LoadRockDebrisParts(ctx)
 		melodySheetHUD, melodySheetErr := renderer.BuildGanonBattleMelodySheetHUD(ctx, width, height)
 		smokeTemplate, smokeErr := renderer.GanonHallSmokeObject(ctx)
@@ -149,11 +183,18 @@ func main() {
 			var stormCloudBaseTransforms []vecmath.Mat4
 
 			// 雷は撃破演出の雷フェーズに入って初めて生成・配置する
-			// (idle中はまだ落ちていないため)。
+			// (idle中はまだ落ちていないため)。lightningIndexはGanonへの
+			// 着弾用の1本、skyLightningIndicesは画面全体に散らす追加の雷。
 			lightningIndex := -1
+			var skyLightningIndices []int
 
 			var smokePuffs []*ganonBattleDefeatSmokePuff
 			var debris []*ganonBattleDefeatDebris
+
+			// bossHiddenは、爆発フェーズでGanon本体を隠し終えたかどうか。
+			// 一度隠したら「テスト再生」的な多重実行はしない想定
+			// (このデバッグボタンはページ遷移前提の一回限りの演出のため)。
+			bossHidden := false
 
 			// startDefeatは、Ganon最終形態撃破演出を開始する。idle以外の
 			// 間に呼ばれても無視する(演出中の多重トリガーを防ぐ、
@@ -228,6 +269,21 @@ func main() {
 							lightningIndex = len(scene.Objects)
 							scene.Objects = append(scene.Objects, lightningObj)
 						}
+
+						// Ganonへの着弾用の1本に加え、画面全体に散らす追加の
+						// 雷も同時に出す(「画面全体に派手に雷が落ちる」
+						// ため)。
+						skyLightning, skyErr := renderer.GanonBattleSkyLightningObjects(ctx)
+						if skyErr != nil {
+							fmt.Println("renderer: failed to build sky lightning objects:", skyErr)
+						} else {
+							for _, obj := range skyLightning {
+								index := len(scene.Objects)
+								scene.Objects = append(scene.Objects, obj)
+								skyLightningIndices = append(skyLightningIndices, index)
+							}
+						}
+
 						game.PlayGanonBattleThunderSound()
 					}
 
@@ -236,14 +292,10 @@ func main() {
 					if t > 1 {
 						t = 1
 					}
-					// 閃光: 序盤(30%地点)でピークに達し、フェーズ終端で0に
-					// 戻る、素早い明滅。
-					const flashPeak = 0.3
-					if t <= flashPeak {
-						overlayAlpha = t / flashPeak
-					} else {
-						overlayAlpha = 1 - (t-flashPeak)/(1-flashPeak)
-					}
+					// 1回の閃光ではなく、ganonBattleLightningFlickersで
+					// 定義した複数回の明滅にすることで、本物の雷のように
+					// 画面全体がバチバチと光る派手さを出す。
+					overlayAlpha = ganonBattleLightningFlickerAlpha(t)
 
 					if phaseElapsed >= ganonBattleDefeatLightningDuration {
 						phase = ganonBattleDefeatExploding
@@ -252,6 +304,18 @@ func main() {
 					}
 
 				case ganonBattleDefeatExploding:
+					if !bossHidden {
+						bossHidden = true
+						// 「爆発して消える」を実際にGanon本体を隠すことで
+						// 表現する(画面外の十分下へ落とすだけで、Objectの
+						// 削除やSceneの作り直しはしない)。直後の閃光
+						// (ganonBattleExplosionFlashFraction)で隠す瞬間が
+						// 見えないよう、フェーズの最初のフレームで隠す。
+						for i := bossStart; i < bossEnd; i++ {
+							scene.Objects[i].Transform = vecmath.Translate(vecmath.NewVec3(0, -500, 0)).Mul(scene.Objects[i].Transform)
+						}
+					}
+
 					if smokePuffs == nil && debris == nil {
 						for _, p := range renderer.GanonBattleExplosionSmokePlacements {
 							obj := smokeTemplate
@@ -273,6 +337,22 @@ func main() {
 					t := phaseElapsed / ganonBattleDefeatExplodingDuration
 					if t > 1 {
 						t = 1
+					}
+
+					// 爆発の瞬間の「ドカン」という閃光。フェーズ冒頭の
+					// ganonBattleExplosionFlashFraction割合だけ、白
+					// オーバーレイを一気に強く光らせてからすぐ消す
+					// (三角形状の立ち上がり)。このタイミングでGanon本体を
+					// 隠しているため、消える瞬間が閃光にまぎれる。
+					if t <= ganonBattleExplosionFlashFraction {
+						ft := t / ganonBattleExplosionFlashFraction
+						if ft < 0.25 {
+							overlayAlpha = ft / 0.25
+						} else {
+							overlayAlpha = 1 - (ft-0.25)/0.75
+						}
+					} else {
+						overlayAlpha = 0
 					}
 
 					for _, s := range smokePuffs {
