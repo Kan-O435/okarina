@@ -57,3 +57,10 @@ func (v Vec3) Normalize() Vec3 {
 	}
 	return v.Scale(1 / length)
 }
+
+// Lerp は、tが0のときv、1のときotherになるよう線形補間したベクトルを返す
+// (tはその範囲外でも外挿として扱う)。カメラ位置・注視点を滑らかに
+// 遷移させる用途に使う。
+func (v Vec3) Lerp(other Vec3, t float64) Vec3 {
+	return v.Add(other.Sub(v).Scale(t))
+}

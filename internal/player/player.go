@@ -77,6 +77,12 @@ type State struct {
 	jumpElapsed float64
 
 	walkPhase float64
+
+	// lastMoveDirection は、直前にDirectionがForward/Backwardになった
+	// ときの値を保持する。ジャンプ中にDirectionがIdleになっても
+	// (ジャンプのジェスチャー自体は前後移動を止めるため)、ジャンプ中は
+	// この向きへ進み続けるために使う(Update参照)。
+	lastMoveDirection Direction
 }
 
 // Player はゲーム全体で共有するプレイヤー状態。
@@ -184,6 +190,11 @@ func (s *State) walkTiltZ() float64 {
 // 具合を進め、このフレームで移動したZ方向の量(ワールド単位)を返す。
 // Idle中は位置も向きも変えず、直前に移動していた方向を向いたままにする
 // (ジャンプ中かどうかに関わらず、これは変わらない)。
+//
+// ただし、ジャンプ中(IsJumping)にDirectionがIdleの場合は例外で、
+// 直前に前後移動していた方向(lastMoveDirection)へ進み続ける。ジャンプの
+// ジェスチャー自体(低い音を鳴らす等)がDirectionをIdleにしてしまうため、
+// これが無いとジャンプ中に足が止まって見えてしまう。
 func (s *State) Update(dt float64) float64 {
 	if s.jumping {
 		s.jumpElapsed += dt
@@ -193,9 +204,18 @@ func (s *State) Update(dt float64) float64 {
 		}
 	}
 
+	if s.Direction == Forward || s.Direction == Backward {
+		s.lastMoveDirection = s.Direction
+	}
+
+	direction := s.Direction
+	if s.jumping && direction == Idle {
+		direction = s.lastMoveDirection
+	}
+
 	var deltaZ float64
 	speed := s.effectiveSpeed()
-	switch s.Direction {
+	switch direction {
 	case Forward:
 		s.Yaw = math.Pi
 		deltaZ = -speed * dt

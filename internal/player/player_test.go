@@ -148,6 +148,36 @@ func TestStartJump_RisesThenLands(t *testing.T) {
 	}
 }
 
+func TestUpdate_ContinuesLastDirectionWhileJumpingEvenIfIdle(t *testing.T) {
+	s := &State{}
+	s.SetDirection(Forward)
+	s.Update(0.1) // 前進中の向きをlastMoveDirectionに記録させる
+
+	s.StartJump()
+	s.SetDirection(Idle) // ジャンプのジェスチャー自体がDirectionをIdleにする想定
+	before := s.Z
+
+	deltaZ := s.Update(0.1)
+
+	if deltaZ == 0 {
+		t.Fatal("expected the player to keep moving forward while jumping even if Direction is Idle")
+	}
+	if s.Z >= before {
+		t.Fatalf("expected Z to decrease (moving forward) while jumping, got before=%v after=%v", before, s.Z)
+	}
+}
+
+func TestUpdate_StaysStillWhileJumpingIfNeverMoved(t *testing.T) {
+	s := &State{}
+	s.StartJump()
+
+	deltaZ := s.Update(0.1)
+
+	if deltaZ != 0 {
+		t.Fatalf("expected no movement while jumping with no prior direction, got deltaZ=%v", deltaZ)
+	}
+}
+
 func TestStartJump_IgnoredWhileAlreadyJumping(t *testing.T) {
 	s := &State{}
 	s.StartJump()

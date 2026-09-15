@@ -112,3 +112,19 @@ var GanonBossBattle []byte
 //
 //go:embed models/horse.glb
 var Horse []byte
+
+// HorseSongSheetTexture は、「馬の歌」(レ→シ→ラ→レ→シ→ラ)の楽譜を
+// 表すバナー画像(背景透過PNG、ChatGPT生成)。草原フィールドで障害物に
+// 近づいた時だけHUDとして表示する(internal/renderer.BuildHorseSongSheetHUD、
+// game.IsNearGrasslandObstacle参照)。
+//
+//go:embed textures/horse-song-sheet.png
+var HorseSongSheetTexture []byte
+
+// TitleOcarina は、タイトル画面の背景でくるくる回るオカリナのGLB
+// (テクスチャ付き、Tripo3D等のセグメンテーション機能で3パーツに分かれて
+// 出力されたモデル)。internal/renderer.BuildTitleSceneがLoadGLBPartsで
+// 読み込み、パーツごとに同じ回転Transformを適用して描画する。
+//
+//go:embed models/title-ocarina.glb
+var TitleOcarina []byte

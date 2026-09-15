@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Kan-O435/okarina/internal/midi"
 	"github.com/Kan-O435/okarina/internal/music"
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
@@ -123,18 +124,45 @@ func setSleepHookForTest(f func(time.Duration)) (restore func()) {
 	}
 }
 
-func TestPlaySongOfTimeAudio_PlaysConfirmationThenContinuation(t *testing.T) {
+func TestPlayConfirmationFanfare_CallsHookAndSleepsForItsDuration(t *testing.T) {
+	called := 0
+	var sleptFor time.Duration
+	playConfirmationFanfare(func() { called++ }, func(d time.Duration) { sleptFor = d })
+
+	if called != 1 {
+		t.Fatalf("expected the fanfare hook to be called once, got %d", called)
+	}
+	if sleptFor != music.ConfirmationFanfareDuration {
+		t.Errorf("slept for %v, want %v (music.ConfirmationFanfareDuration)", sleptFor, music.ConfirmationFanfareDuration)
+	}
+}
+
+func TestPlayConfirmationFanfare_NilHookDoesNothing(t *testing.T) {
+	slept := false
+	playConfirmationFanfare(nil, func(time.Duration) { slept = true })
+
+	if slept {
+		t.Fatal("expected no sleep when the fanfare hook is not registered")
+	}
+}
+
+func TestPlaySongOfTimeAudio_PlaysConfirmationFanfareThenContinuation(t *testing.T) {
 	defer setSleepHookForTest(func(time.Duration) {})()
 
+	fanfareCalls := 0
+	SetPlayConfirmationFanfareFunc(func() { fanfareCalls++ })
 	var played, stopped []int
 	SetPlayNoteFunc(func(note, velocity int) { played = append(played, note) })
 	SetStopNoteFunc(func(note int) { stopped = append(stopped, note) })
-	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+	defer func() { SetPlayConfirmationFanfareFunc(nil); SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	playSongOfTimeAudio()
 
-	want := append(append([]music.ContinuationNote{}, music.SongOfTimeConfirmation...), music.SongOfTimeOpening...)
-	want = append(want, music.SongOfTimeContinuation...)
+	if fanfareCalls != 1 {
+		t.Fatalf("expected the confirmation fanfare (mp3) to be played once, got %d calls", fanfareCalls)
+	}
+
+	want := append(append([]music.ContinuationNote{}, music.SongOfTimeOpening...), music.SongOfTimeContinuation...)
 	if len(played) != len(want) {
 		t.Fatalf("played %d notes, want %d", len(played), len(want))
 	}
@@ -152,11 +180,12 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 	songOfTimePlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
 
-	wantTotal := len(music.SongOfTimeConfirmation) + len(music.SongOfTimeOpening) + len(music.SongOfTimeContinuation)
+	wantTotal := len(music.SongOfTimeOpening) + len(music.SongOfTimeContinuation)
 
 	done := make(chan struct{})
 	var mu sync.Mutex
 	var played []int
+	SetPlayConfirmationFanfareFunc(func() {})
 	SetPlayNoteFunc(func(note, velocity int) {
 		mu.Lock()
 		played = append(played, note)
@@ -167,7 +196,7 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 		}
 	})
 	SetStopNoteFunc(func(note int) {})
-	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+	defer func() { SetPlayConfirmationFanfareFunc(nil); SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	onMelodyRecorded(songOfTime)
 
@@ -205,11 +234,12 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 	horseSongPlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
 
-	wantTotal := len(music.SongOfTimeConfirmation) + len(music.HorseSongContinuation)
+	wantTotal := len(music.HorseSongContinuation)
 
 	done := make(chan struct{})
 	var mu sync.Mutex
 	var played []int
+	SetPlayConfirmationFanfareFunc(func() {})
 	SetPlayNoteFunc(func(note, velocity int) {
 		mu.Lock()
 		played = append(played, note)
@@ -220,7 +250,7 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 		}
 	})
 	SetStopNoteFunc(func(note int) {})
-	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+	defer func() { SetPlayConfirmationFanfareFunc(nil); SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	onMelodyRecorded(horseSong)
 
@@ -234,54 +264,95 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 // resetJumpGesture はジャンプジェスチャーの検出状態をテスト用に初期化する。
 func resetJumpGesture() {
 	jumpGestureLow = false
-	jumpGestureCount = 0
 }
 
-func TestOnPitchDetected_TwoLowNotesTriggerJump(t *testing.T) {
+func TestOnPitchDetected_LowNoteTriggersJump(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
 	SetJumpTrigger(func() { triggered++ })
 	defer SetJumpTrigger(nil)
 
-	OnPitchDetected(100) // 1回目の低い音(立ち上がり)
-	if triggered != 0 {
-		t.Fatalf("expected no trigger after only one low note, got %d", triggered)
-	}
-
-	OnPitchDetected(0)   // 無音(1回目の低い音が終わる)
-	OnPitchDetected(120) // 2回目の低い音(立ち上がり) → 発火するはず
+	OnPitchDetected(100) // 低い音の立ち上がり → 即座に発火するはず
 	if triggered != 1 {
-		t.Fatalf("expected exactly one trigger after two low notes, got %d", triggered)
+		t.Fatalf("expected exactly one trigger after a single low note, got %d", triggered)
 	}
 }
 
-func TestOnPitchDetected_SustainedLowNoteCountsOnce(t *testing.T) {
+func TestOnPitchDetected_SustainedLowNoteTriggersOnce(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
 	SetJumpTrigger(func() { triggered++ })
 	defer SetJumpTrigger(nil)
 
-	// 同じ低い音を無音を挟まず連続で読み取っても、1回とカウントする。
+	// 同じ低い音を無音を挟まず連続で読み取っても、立ち上がりの1回だけ発火する。
 	for i := 0; i < 5; i++ {
 		OnPitchDetected(100)
 	}
-	if triggered != 0 {
-		t.Fatalf("expected sustained low pitch readings to count as a single onset, got %d triggers", triggered)
+	if triggered != 1 {
+		t.Fatalf("expected sustained low pitch readings to trigger only once, got %d triggers", triggered)
 	}
 }
 
-func TestOnPitchDetected_HighNoteResetsJumpGesture(t *testing.T) {
+func TestOnPitchDetected_LowNoteAfterSilenceTriggersAgain(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
 	SetJumpTrigger(func() { triggered++ })
 	defer SetJumpTrigger(nil)
 
-	OnPitchDetected(100) // 1回目の低い音
-	OnPitchDetected(0)
-	OnPitchDetected(440) // 明確に高い音 → カウントリセット
-	OnPitchDetected(0)
-	OnPitchDetected(120) // これは(リセット後の)1回目扱いのはず
+	OnPitchDetected(100) // 1回目の低い音 → 発火
+	OnPitchDetected(0)   // 無音
+	OnPitchDetected(120) // 2回目の低い音(新たな立ち上がり) → 再び発火するはず
+	if triggered != 2 {
+		t.Fatalf("expected a new low note after silence to trigger again, got %d triggers", triggered)
+	}
+}
+
+func TestOnPitchDetected_HighNoteDoesNotTriggerJump(t *testing.T) {
+	resetJumpGesture()
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	OnPitchDetected(440) // 明確に高い音 → 発火しない
 	if triggered != 0 {
-		t.Fatalf("expected the gesture count to reset after a clearly high note, got %d triggers", triggered)
+		t.Fatalf("expected a high note not to trigger a jump, got %d triggers", triggered)
+	}
+}
+
+func TestOnMIDIEvent_NoteCTriggersTitleStart(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	OnMIDIEvent(midi.Event{Note: 60, Velocity: 100, IsNoteOn: true}) // C4
+	if triggered != 1 {
+		t.Fatalf("expected exactly one trigger for a C Note On, got %d", triggered)
+	}
+
+	OnMIDIEvent(midi.Event{Note: 72, Velocity: 100, IsNoteOn: true}) // C5(オクターブ違い)
+	if triggered != 2 {
+		t.Fatalf("expected the trigger to fire regardless of octave, got %d", triggered)
+	}
+}
+
+func TestOnMIDIEvent_NonCNoteDoesNotTriggerTitleStart(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	OnMIDIEvent(midi.Event{Note: 62, Velocity: 100, IsNoteOn: true}) // D4
+	if triggered != 0 {
+		t.Fatalf("expected no trigger for a non-C note, got %d", triggered)
+	}
+}
+
+func TestOnMIDIEvent_NoteOffDoesNotTriggerTitleStart(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	OnMIDIEvent(midi.Event{Note: 60, Velocity: 0, IsNoteOn: false}) // C4 Note Off
+	if triggered != 0 {
+		t.Fatalf("expected no trigger for a Note Off, got %d", triggered)
 	}
 }

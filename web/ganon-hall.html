@@ -16,6 +16,15 @@
   <a href="ganon-battle.html" style="color: #7CFC9A;">戦場跡案を見る</a>
 </p>
 
+<h3>MIDI入力</h3>
+<div id="midi-status"></div>
+
+<h3>オカリナの音</h3>
+<div id="audio-controls">
+  <button id="btn-enable-audio">音を有効にする(初回にクリック)</button>
+  <button id="btn-test-sound">テスト再生</button>
+</div>
+
 <h3>オタマトーンでLinkを移動</h3>
 <div id="mic-pitch-status">マイクは未接続です</div>
 <button id="btn-start-mic-pitch">マイクを開始</button>
@@ -34,6 +43,8 @@
 <button id="btn-defeat-ganon">ガノン(第一形態)を倒した(テスト)</button>
 
 <script src="wasm_exec.js"></script>
+<script src="audio.js"></script>
+<script src="midi-input.js"></script>
 <script src="pitch.js"></script>
 <script src="mic-pitch.js"></script>
 <script src="debug-keys.js"></script>

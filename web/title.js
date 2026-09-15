@@ -1,24 +1,18 @@
 const statusEl = document.getElementById('status');
 const btnEnableAudio = document.getElementById('btn-enable-audio');
-const btnTestSound = document.getElementById('btn-test-sound');
 
 if (!WebAssembly) {
   statusEl.textContent = "このブラウザはWebAssemblyに対応していません";
   statusEl.className = "error";
 } else {
   const go = new Go();
-  WebAssembly.instantiateStreaming(fetch("ganon-battle.wasm"), go.importObject)
+  WebAssembly.instantiateStreaming(fetch("title.wasm"), go.importObject)
     .then((result) => {
-      statusEl.textContent = "ガノンフィールド(戦場跡): Go WASM 起動完了";
+      statusEl.textContent = "タイトル画面: Go WASM 起動完了";
       go.run(result.instance);
 
       btnEnableAudio.addEventListener('click', () => {
         ensureAudioContext();
-      });
-
-      btnTestSound.addEventListener('click', () => {
-        playNote(60, 100);
-        setTimeout(() => stopNote(60), 500);
       });
 
       initMIDI();

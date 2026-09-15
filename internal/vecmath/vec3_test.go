@@ -62,3 +62,20 @@ func TestVec3Normalize(t *testing.T) {
 		t.Errorf("Normalize() of zero vector = %v, want %v", got, zero)
 	}
 }
+
+func TestVec3Lerp(t *testing.T) {
+	a := NewVec3(0, 0, 0)
+	b := NewVec3(10, 20, -10)
+
+	if got := a.Lerp(b, 0); got != a {
+		t.Errorf("Lerp(t=0) = %v, want %v", got, a)
+	}
+	if got := a.Lerp(b, 1); got != b {
+		t.Errorf("Lerp(t=1) = %v, want %v", got, b)
+	}
+
+	want := NewVec3(5, 10, -5)
+	if got := a.Lerp(b, 0.5); !vec3ApproxEqual(got, want) {
+		t.Errorf("Lerp(t=0.5) = %v, want %v", got, want)
+	}
+}
