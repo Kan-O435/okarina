@@ -123,6 +123,39 @@ const (
 	GanonBackgroundHall
 )
 
+// buildGanonSceneObjects は、BuildGanonScene/BuildGanonSceneWithBossRange
+// 共通の中身(地面・背景・ボス・Linkの積み上げ)。ボスがobjects中で占める
+// 範囲(bossStart、bossEnd、半開区間)もあわせて返す。
+func buildGanonSceneObjects(c *Context, variant GanonBackgroundVariant) (objects []Object, bossStart, bossEnd int, link LinkPlacement, err error) {
+	objects = []Object{ganonGroundObject(c)}
+
+	background, err := ganonBackgroundObjects(c, variant)
+	if err != nil {
+		return nil, 0, 0, LinkPlacement{}, err
+	}
+	objects = append(objects, background...)
+
+	bossStart = len(objects)
+	boss, err := ganonBossObject(c, variant)
+	if err != nil {
+		return nil, 0, 0, LinkPlacement{}, err
+	}
+	objects = append(objects, boss...)
+	bossEnd = len(objects)
+
+	linkSpawnZ, linkY, linkHeight := ganonLinkZ, ganonLinkY, ganonLinkHeight
+	if variant == GanonBackgroundHall {
+		linkSpawnZ, linkY, linkHeight = ganonLinkHallZ, ganonLinkHallY, ganonLinkHallHeight
+	}
+
+	linkObjs, linkLocal, err := ganonLinkObject(c, linkSpawnZ, linkY, linkHeight)
+	if err != nil {
+		return nil, 0, 0, LinkPlacement{}, err
+	}
+	objects, link = appendLinkObjects(objects, linkObjs, linkLocal, linkSpawnZ)
+	return objects, bossStart, bossEnd, link, nil
+}
+
 // BuildGanonScene は、ガノンフィールドの土台(地面・背景・Link)を配置した
 // Sceneを組み立てる。variantで背景デザイン案(戦場跡/玉座の間)を選べる。
 // 戻り値のLinkPlacementは、他のフィールドと同様、プレイヤー移動に合わせて
@@ -138,36 +171,44 @@ func BuildGanonScene(c *Context, variant GanonBackgroundVariant) (scene *Scene, 
 	projection := vecmath.Perspective(vecmath.Radians(ganonVerticalFOV(variant)), aspect, 0.1, 150)
 	view := ganonCameraView(variant)
 
-	objects := []Object{ganonGroundObject(c)}
-
-	background, err := ganonBackgroundObjects(c, variant)
+	objects, _, _, link, err := buildGanonSceneObjects(c, variant)
 	if err != nil {
 		return nil, LinkPlacement{}, err
 	}
-	objects = append(objects, background...)
-
-	boss, err := ganonBossObject(c, variant)
-	if err != nil {
-		return nil, LinkPlacement{}, err
-	}
-	objects = append(objects, boss...)
-
-	linkSpawnZ, linkY, linkHeight := ganonLinkZ, ganonLinkY, ganonLinkHeight
-	if variant == GanonBackgroundHall {
-		linkSpawnZ, linkY, linkHeight = ganonLinkHallZ, ganonLinkHallY, ganonLinkHallHeight
-	}
-
-	linkObjs, linkLocal, err := ganonLinkObject(c, linkSpawnZ, linkY, linkHeight)
-	if err != nil {
-		return nil, LinkPlacement{}, err
-	}
-	objects, link = appendLinkObjects(objects, linkObjs, linkLocal, linkSpawnZ)
 
 	return &Scene{
 		Program:        program,
 		ViewProjection: projection.Mul(view),
 		Objects:        objects,
 	}, link, nil
+}
+
+// BuildGanonSceneWithBossRange はBuildGanonScneと同じくSceneを組み立てるが、
+// 加えてscene.Objects内でボスが占める範囲(bossStart〜bossEnd、半開区間)を
+// 返す。ganon-battleフィールドのGanon最終形態撃破演出
+// (cmd/ganon-battle/main.go)が、爆発の瞬間にボスのTransformを書き換えて
+// 画面外へ隠す(「爆発して消える」を実際に消すことで表現する)ために使う。
+func BuildGanonSceneWithBossRange(c *Context, variant GanonBackgroundVariant) (scene *Scene, bossStart, bossEnd int, link LinkPlacement, err error) {
+	program, err := c.NewProgram(basicVertexShaderSrc, basicFragmentShaderSrc)
+	if err != nil {
+		return nil, 0, 0, LinkPlacement{}, err
+	}
+
+	width, height := c.CanvasSize()
+	aspect := float64(width) / float64(height)
+	projection := vecmath.Perspective(vecmath.Radians(ganonVerticalFOV(variant)), aspect, 0.1, 150)
+	view := ganonCameraView(variant)
+
+	objects, bossStart, bossEnd, link, err := buildGanonSceneObjects(c, variant)
+	if err != nil {
+		return nil, 0, 0, LinkPlacement{}, err
+	}
+
+	return &Scene{
+		Program:        program,
+		ViewProjection: projection.Mul(view),
+		Objects:        objects,
+	}, bossStart, bossEnd, link, nil
 }
 
 // ganonHallCameraY/Z は、玉座の間案(GanonBackgroundHall)専用のカメラ位置。
@@ -524,15 +565,29 @@ var ganonBattleStormCloudColor = vecmath.NewVec3(0.22, 0.24, 0.3)
 
 // ganonBattleStormCloudPlacements は、Ganon最終形態撃破カットシーンの
 // 冒頭でアリーナ上空に集まる嵐雲の配置一覧。GanonStormCloud(7種類)の
-// うちいくつかを選び、ganonBossBattleZ(-38)付近の上空・奥に大きめに
-// 配置している。templeCloudPlacement(demo.go)と全く同じ構造体を流用する
+// パーツを使い回し、画面の左右・奥行き全体(X: -30〜30、Z: -30〜-62)に
+// 散らして、上空全体が嵐雲で覆われるようにしている。
+//
+// 戦場跡案のカメラ(ganonBattleCameraY=6、垂直画角ganonBattleFOVDegrees=
+// 35.3°、水平視線でチルト無し)は画角が狭いため、Yをそのまま高くすると
+// 雲がフレームの上端よりさらに上に出てしまい画面に映らない。そのため各
+// 雲のYは、そのZ位置での画面上端のワールドY
+// (ganonBattleCameraY + 距離*tan(35.3°/2))から雲の高さ(Height)の半分を
+// 引いた値にしている(雲の中心をちょうど画面上端に合わせることで、雲の
+// 下半分だけが画面に見え、上半分は上端で切れる「垂れ込めた雲」の見た目に
+// なる)。templeCloudPlacement(demo.go)と全く同じ構造体を流用する
 // (PartIndexはgltf.ParseParts()が返す順序)。
 var ganonBattleStormCloudPlacements = []templeCloudPlacement{
-	{PartIndex: 0, X: -14, Y: 22, Z: -42, Height: 11},
-	{PartIndex: 1, X: 10, Y: 26, Z: -48, Height: 13},
-	{PartIndex: 2, X: -4, Y: 30, Z: -55, Height: 12},
-	{PartIndex: 3, X: 16, Y: 20, Z: -34, Height: 9},
-	{PartIndex: 5, X: -18, Y: 24, Z: -30, Height: 10},
+	{PartIndex: 0, X: -14, Y: 7.5, Z: -42, Height: 11},
+	{PartIndex: 1, X: 10, Y: 8.4, Z: -48, Height: 13},
+	{PartIndex: 2, X: -4, Y: 11.1, Z: -55, Height: 12},
+	{PartIndex: 3, X: 16, Y: 6.0, Z: -34, Height: 9},
+	{PartIndex: 5, X: -18, Y: 4.2, Z: -30, Height: 10},
+	{PartIndex: 4, X: -30, Y: 7.4, Z: -40, Height: 10},
+	{PartIndex: 6, X: 28, Y: 8.1, Z: -44, Height: 11},
+	{PartIndex: 0, X: 22, Y: 11.6, Z: -58, Height: 13},
+	{PartIndex: 1, X: -26, Y: 10.2, Z: -52, Height: 12},
+	{PartIndex: 3, X: 2, Y: 12.4, Z: -62, Height: 14},
 }
 
 // GanonBattleStormCloudObjects は、internal/assets.GanonStormCloudから
@@ -609,18 +664,72 @@ func GanonBattleLightningObject(c *Context) (obj Object, localTransform vecmath.
 	return obj, localTransform, nil
 }
 
+// ganonBattleSkyLightningPlacements は、雷フェーズで着弾用の1本
+// (GanonBattleLightningObject)とは別に追加で出す雷。templeCloudPlacement
+// (demo.go)と同じ構造体を流用する(PartIndexはGanonLightning、3種類の
+// 分岐雷から順にばらけて選ぶ)。奥の空だけに落とすと「背景の後ろだけで
+// 光っている」ように見えてしまうため、3つの奥行きに分けて配置している:
+//  1. 遠景(Z: -55〜-60) — 空いっぱいに伸びる一番奥の雷
+//  2. フィールド中景(Z: -28〜-33) — 手前の廃墟(ganonBackgroundObjects)の
+//     中、Linkのすぐ奥あたりに実際に落ちているように見せる
+//  3. Ganon直撃(Z: -37〜-39、X: 0付近) — 着弾用の1本(GanonBattleBossZの
+//     真上)に加えて、少しずらした位置にもう2本落とし、ガノンに何度も
+//     雷が直接降り注いでいるように見せる
+var ganonBattleSkyLightningPlacements = []templeCloudPlacement{
+	// 1. 遠景
+	{PartIndex: 0, X: -22, Y: 0, Z: -55, Height: 20},
+	{PartIndex: 1, X: 20, Y: 0, Z: -60, Height: 18},
+	// 2. フィールド中景(廃墟の中)
+	{PartIndex: 2, X: -12, Y: 0, Z: -30, Height: 15},
+	{PartIndex: 0, X: 14, Y: 0, Z: -28, Height: 14},
+	{PartIndex: 1, X: 24, Y: 0, Z: -33, Height: 16},
+	// 3. Ganon直撃(GanonBattleLightningObjectの着弾点のすぐ近く)
+	{PartIndex: 2, X: 3.5, Y: 0, Z: -37, Height: 14},
+	{PartIndex: 0, X: -3.5, Y: 0, Z: -39, Height: 13},
+}
+
+// GanonBattleSkyLightningObjects は、ganonBattleSkyLightningPlacementsで
+// 指定した雷を空に配置する(着弾用の雷と同じganonBattleLightningColorで
+// 着色)。demo.goのtempleCloudObjectsと同様、GroundTransformで独立に
+// スケール・配置する。呼び出し側(cmd/ganon-battle/main.go)は、雷フェーズの
+// 開始時にこれをまとめてSceneへ追加する想定。
+func GanonBattleSkyLightningObjects(c *Context) ([]Object, error) {
+	prims, err := gltf.ParseParts(assets.GanonLightning)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]Object, 0, len(ganonBattleSkyLightningPlacements))
+	for _, p := range ganonBattleSkyLightningPlacements {
+		if p.PartIndex < 0 || p.PartIndex >= len(prims) {
+			continue
+		}
+		model, err := c.buildModel(&prims[p.PartIndex])
+		if err != nil {
+			return nil, err
+		}
+		localTransform := model.GroundTransform(0, 0, p.Height)
+		transform := vecmath.Translate(vecmath.NewVec3(p.X, p.Y, p.Z)).Mul(localTransform)
+		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: ganonBattleLightningColor})
+	}
+	return objects, nil
+}
+
 // GanonBattleExplosionSmokePlacements は、Ganon最終形態を倒した際に
 // 立ち上る爆発煙の配置一覧。GanonHallSmokePuffPlacement(玉座の間の第一
 // 形態撃破演出と同じ構造体、GanonHallSmokeObjectと組み合わせて使う)を
 // 流用する。カメラが固定であることを利用し、ganonBossBattle(戦場跡案の
-// ボス、Z=ganonBossBattleZ)を画面から覆い隠せるよう、玉座の間より
-// 大きめ・多めに配置している。
+// ボス、Z=ganonBossBattleZ)を画面から覆い隠せるよう、玉座の間よりさらに
+// 大きめ・多め(8個、EndHalfSizeも拡大)に配置し、爆発の派手さを出す。
 var GanonBattleExplosionSmokePlacements = []GanonHallSmokePuffPlacement{
-	{X: -1.2, Y: ganonBossBattleY + ganonBossBattleHeight*0.3, Z: ganonBossBattleZ + 0.6, StartHalfSize: 0.5, EndHalfSize: 3.2, RiseHeight: 2.4},
-	{X: 1.0, Y: ganonBossBattleY + ganonBossBattleHeight*0.5, Z: ganonBossBattleZ - 0.3, StartHalfSize: 0.5, EndHalfSize: 3.6, RiseHeight: 3.0},
-	{X: 0.0, Y: ganonBossBattleY + ganonBossBattleHeight*0.7, Z: ganonBossBattleZ + 0.3, StartHalfSize: 0.4, EndHalfSize: 3.0, RiseHeight: 2.7},
-	{X: -0.6, Y: ganonBossBattleY + ganonBossBattleHeight*0.9, Z: ganonBossBattleZ - 0.6, StartHalfSize: 0.4, EndHalfSize: 2.8, RiseHeight: 3.3},
-	{X: 1.6, Y: ganonBossBattleY + ganonBossBattleHeight*0.2, Z: ganonBossBattleZ + 0.9, StartHalfSize: 0.5, EndHalfSize: 3.0, RiseHeight: 2.0},
+	{X: -1.2, Y: ganonBossBattleY + ganonBossBattleHeight*0.3, Z: ganonBossBattleZ + 0.6, StartHalfSize: 0.6, EndHalfSize: 4.5, RiseHeight: 3.2},
+	{X: 1.0, Y: ganonBossBattleY + ganonBossBattleHeight*0.5, Z: ganonBossBattleZ - 0.3, StartHalfSize: 0.6, EndHalfSize: 5.0, RiseHeight: 3.8},
+	{X: 0.0, Y: ganonBossBattleY + ganonBossBattleHeight*0.7, Z: ganonBossBattleZ + 0.3, StartHalfSize: 0.5, EndHalfSize: 4.2, RiseHeight: 3.4},
+	{X: -0.6, Y: ganonBossBattleY + ganonBossBattleHeight*0.9, Z: ganonBossBattleZ - 0.6, StartHalfSize: 0.5, EndHalfSize: 4.0, RiseHeight: 4.2},
+	{X: 1.6, Y: ganonBossBattleY + ganonBossBattleHeight*0.2, Z: ganonBossBattleZ + 0.9, StartHalfSize: 0.6, EndHalfSize: 4.0, RiseHeight: 2.6},
+	{X: -2.2, Y: ganonBossBattleY + ganonBossBattleHeight*0.4, Z: ganonBossBattleZ - 1.2, StartHalfSize: 0.5, EndHalfSize: 4.4, RiseHeight: 3.6},
+	{X: 2.4, Y: ganonBossBattleY + ganonBossBattleHeight*0.6, Z: ganonBossBattleZ + 1.4, StartHalfSize: 0.5, EndHalfSize: 4.6, RiseHeight: 3.0},
+	{X: 0.2, Y: ganonBossBattleY + ganonBossBattleHeight*1.1, Z: ganonBossBattleZ, StartHalfSize: 0.4, EndHalfSize: 3.6, RiseHeight: 4.8},
 }
 
 // GanonBattleExplosionDebrisPlacements は、爆発で外側へ飛び散る岩片の
@@ -628,12 +737,15 @@ var GanonBattleExplosionSmokePlacements = []GanonHallSmokePuffPlacement{
 // 構造体、GanonHallCollapseRockObjectと組み合わせて使う)を流用する。
 // X/Zはそれぞれの岩片が外側へ飛んでいく先(ganonBossBattleZ付近を中心に
 // 散らした位置)を表し、実際の「中心から外側へ飛んでから落ちる」動きは
-// 呼び出し側(cmd/ganon-battle/main.go)が毎フレーム計算する。
+// 呼び出し側(cmd/ganon-battle/main.go)が毎フレーム計算する。より遠く・
+// 大きく吹き飛ぶよう、玉座の間の崩落演出より飛距離・サイズを拡大している。
 var GanonBattleExplosionDebrisPlacements = []GanonHallCollapseRockPlacement{
-	{X: -2.4, Z: ganonBossBattleZ + 2.0, HalfSize: 0.5},
-	{X: 2.0, Z: ganonBossBattleZ - 1.6, HalfSize: 0.6},
-	{X: -1.2, Z: ganonBossBattleZ - 2.4, HalfSize: 0.4},
-	{X: 2.8, Z: ganonBossBattleZ + 1.2, HalfSize: 0.5},
-	{X: 0.4, Z: ganonBossBattleZ + 2.8, HalfSize: 0.45},
-	{X: -3.0, Z: ganonBossBattleZ - 0.4, HalfSize: 0.55},
+	{X: -4.5, Z: ganonBossBattleZ + 3.5, HalfSize: 0.7},
+	{X: 3.8, Z: ganonBossBattleZ - 3.0, HalfSize: 0.85},
+	{X: -2.2, Z: ganonBossBattleZ - 4.2, HalfSize: 0.6},
+	{X: 5.0, Z: ganonBossBattleZ + 2.0, HalfSize: 0.75},
+	{X: 0.8, Z: ganonBossBattleZ + 5.0, HalfSize: 0.65},
+	{X: -5.2, Z: ganonBossBattleZ - 0.8, HalfSize: 0.8},
+	{X: 2.6, Z: ganonBossBattleZ + 4.4, HalfSize: 0.55},
+	{X: -3.6, Z: ganonBossBattleZ + 1.2, HalfSize: 0.7},
 }
