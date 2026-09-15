@@ -28,7 +28,7 @@ var doorOpenDelay = 7 * time.Second
 
 // nearDoorRangeZ は、プレイヤーがこの距離以内に扉に近づいたら「近い」と
 // みなす範囲(ワールド単位)。楽譜/オカリナのHUD表示の切り替えに使う。
-const nearDoorRangeZ = 8.0
+const nearDoorRangeZ = 4.0
 
 var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
