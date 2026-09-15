@@ -31,12 +31,20 @@
 
 <h3>デバッグ操作</h3>
 <div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
+<button id="btn-defeat-ganon">ガノン(第一形態)を倒した(テスト)</button>
 
 <script src="wasm_exec.js"></script>
 <script src="pitch.js"></script>
 <script src="mic-pitch.js"></script>
 <script src="debug-keys.js"></script>
 <script src="ganon-hall.js"></script>
+<script>
+  // 「特定の演奏でGanonの第一形態を倒す」処理はまだ無いため、動作確認用の
+  // ボタンから直接goDefeatGanonFirstForm()を呼ぶ仮実装(btn-open-doorと同様)。
+  document.getElementById('btn-defeat-ganon').addEventListener('click', () => {
+    window.goDefeatGanonFirstForm();
+  });
+</script>
 
 </body>
 </html>

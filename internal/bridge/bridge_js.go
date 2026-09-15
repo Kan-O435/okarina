@@ -20,7 +20,8 @@ func Init() {
 	js.Global().Set("goOnPitchDetected", js.FuncOf(goOnPitchDetected))
 	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection)")
+	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm)")
 
 	// JS側(web/audio.jsのplayNote/stopNote)の実装をgameパッケージに差し込む。
 	// これにより、Goから「時の歌」の続きなどを自動再生できる。
@@ -108,5 +109,16 @@ func goSetDebugDirection(this js.Value, args []js.Value) interface{} {
 		return nil
 	}
 	game.SetDebugDirection(args[0].String())
+	return nil
+}
+
+// goDefeatGanonFirstForm はJavaScript側(玉座の間のデバッグボタン)から
+// 呼び出され、Ganonの第一形態を倒した演出(玉座の間の崩落→戦場跡
+// フィールドへのページ遷移)を開始する。「特定の演奏で倒す」処理はまだ
+// 無いため、現時点では動作確認用のボタンから直接呼ぶ想定
+// (goOpenDoorと同様の仮実装パターン)。
+func goDefeatGanonFirstForm(this js.Value, args []js.Value) interface{} {
+	game.TriggerGanonHallCollapse()
+	CallConsoleLog("bridge: goDefeatGanonFirstForm() called, starting hall collapse")
 	return nil
 }

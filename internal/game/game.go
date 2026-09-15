@@ -62,7 +62,8 @@ type Game struct {
 // onFieldTransitionは、扉が開いた後にLinkが自動で前進して扉を通過し終えた
 // タイミングで1回だけ呼ばれる(nilなら何も起きない)。
 func New(scene *renderer.Scene, link renderer.LinkPlacement, doorIndex int, onFieldTransition func()) *Game {
-	player.Player.Z = link.SpawnZ
+	player.Player.SpawnAt(link.SpawnZ)
+	renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
 	return &Game{scene: scene, link: link, doorIndex: doorIndex, onFieldTransition: onFieldTransition}
 }
 
@@ -96,10 +97,8 @@ func (g *Game) Update(dt float64) {
 		player.Player.SetDirection(player.Forward)
 	}
 
-	deltaZ := player.Player.Update(dt)
-	if deltaZ != 0 {
-		g.scene.Objects[g.link.Index].Transform = player.Player.Transform(g.link.LocalTransform)
-	}
+	player.Player.Update(dt)
+	renderer.SetLinkTransform(g.scene, g.link, player.Player.Transform(g.link.LocalTransform))
 
 	if g.autoWalking && !g.transitioned && player.Player.Z <= renderer.DoorPassThroughZ {
 		g.transitioned = true
@@ -126,6 +125,28 @@ var horseSummoner func()
 // SetHorseSummoner は、草原フィールドで馬を呼び出す関数を登録する。
 func SetHorseSummoner(f func()) {
 	horseSummoner = f
+}
+
+// ganonHallCollapseTrigger は、玉座の間でGanonの第一形態を倒した際の
+// 演出(崩落→戦場跡フィールドへページ遷移)を開始する関数。
+// cmd/ganon-hall/main.goが起動時に登録する(horseSummonerと同様の
+// コールバックパターン)。「特定の演奏で倒す」処理はまだ無いため、
+// 現時点ではデバッグボタン(bridge.goのgoDefeatGanonFirstForm)から
+// 直接呼ばれる。
+var ganonHallCollapseTrigger func()
+
+// SetGanonHallCollapseTrigger は、玉座の間の崩落演出を開始する関数を登録する。
+func SetGanonHallCollapseTrigger(f func()) {
+	ganonHallCollapseTrigger = f
+}
+
+// TriggerGanonHallCollapse はブリッジ(JavaScript側)から呼ばれ、登録済みの
+// 崩落演出開始関数を実行する。未登録の場合(玉座の間フィールド以外の
+// ページ)は何もしない。
+func TriggerGanonHallCollapse() {
+	if ganonHallCollapseTrigger != nil {
+		ganonHallCollapseTrigger()
+	}
 }
 
 // jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
