@@ -3,6 +3,7 @@ package game
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -24,6 +25,10 @@ const doorMelodyName = "DOOR_MELODY"
 // doorOpenDelay は、扉のメロディが認識されてから実際に扉が開き始めるまでの
 // 「ため」の時間。varにしているのはテストから短く差し替えられるようにするため。
 var doorOpenDelay = 7 * time.Second
+
+// nearDoorRangeZ は、プレイヤーがこの距離以内に扉に近づいたら「近い」と
+// みなす範囲(ワールド単位)。楽譜/オカリナのHUD表示の切り替えに使う。
+const nearDoorRangeZ = 8.0
 
 var recorder = music.NewRecorder(melodyIdleTimeout, onMelodyRecorded)
 
@@ -65,6 +70,12 @@ func New(scene *renderer.Scene, link renderer.LinkPlacement, doorIndex int, onFi
 // メロディ認識、今は動作確認用のボタン)から呼ばれる想定。
 func (g *Game) OpenDoor() {
 	g.door.Open()
+}
+
+// IsNearDoor は、プレイヤー(Link)が扉の近くにいるかどうかを返す。
+// 楽譜/オカリナのHUD表示を、扉に近づいた時だけ見せるために使う。
+func (g *Game) IsNearDoor() bool {
+	return math.Abs(player.Player.Z-renderer.DoorCenterZ) <= nearDoorRangeZ
 }
 
 // Update はdeltaTime(秒)だけゲーム状態を進め、扉・プレイヤー(Link)の
@@ -133,6 +144,16 @@ func OpenDoor() {
 	if instance != nil {
 		instance.OpenDoor()
 	}
+}
+
+// IsNearDoor は、プレイヤーが扉の近くにいるかどうかを返す。楽譜/オカリナの
+// HUD表示を切り替えるために、Update()から毎フレーム参照する。インスタンスが
+// 未登録の場合はfalseを返す。
+func IsNearDoor() bool {
+	if instance == nil {
+		return false
+	}
+	return instance.IsNearDoor()
 }
 
 // OnPitchDetected はマイクから検出された最新のピッチ(Hz)をプレイヤーの

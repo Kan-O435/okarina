@@ -47,7 +47,7 @@ func main() {
 				ctx.RunLoop(func(dt float64) {
 					g.Update(dt)
 					scene.Render(ctx)
-					if songHUD != nil {
+					if songHUD != nil && game.IsNearDoor() {
 						songHUD.Render(ctx, width, height)
 					}
 				})
