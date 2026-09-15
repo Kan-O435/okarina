@@ -169,3 +169,12 @@ var HorseSongSheetTexture []byte
 //
 //go:embed models/title-ocarina.glb
 var TitleOcarina []byte
+
+// GanonHallMelodySheetTexture は、玉座の間でGanonの第一形態を倒す合図
+// 「光のプレリュード」(レ→ラ→レ→ラ→シ→レ)の楽譜を表すバナー画像
+// (背景透過PNG、ユーザー提供)。崩落演出が始まる前だけHUDとして表示する
+// (internal/renderer.BuildGanonHallMelodySheetHUD、
+// game.GanonHallMelodyPlayed参照)。
+//
+//go:embed textures/ganon-hall-melody-sheet.png
+var GanonHallMelodySheetTexture []byte

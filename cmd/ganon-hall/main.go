@@ -94,12 +94,15 @@ func main() {
 		scene, link, err := renderer.BuildGanonScene(ctx, renderer.GanonBackgroundHall)
 		rockParts, rockPartsErr := renderer.LoadRockDebrisParts(ctx)
 		smokeTemplate, smokeErr := renderer.GanonHallSmokeObject(ctx)
+		melodySheetHUD, melodySheetErr := renderer.BuildGanonHallMelodySheetHUD(ctx, width, height)
 		if err != nil {
 			fmt.Println("renderer: failed to build ganon scene:", err)
 		} else if rockPartsErr != nil {
 			fmt.Println("renderer: failed to load rock debris parts:", rockPartsErr)
 		} else if smokeErr != nil {
 			fmt.Println("renderer: failed to load smoke effect:", smokeErr)
+		} else if melodySheetErr != nil {
+			fmt.Println("renderer: failed to build ganon hall melody sheet HUD:", melodySheetErr)
 		} else {
 			player.Player.SpawnAt(link.SpawnZ)
 			renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
@@ -232,6 +235,12 @@ func main() {
 					}
 				}
 				scene.Render(ctx)
+
+				// 光のプレリュードの楽譜は、崩落演出が始まる前(まだ正しく
+				// 演奏できていない間)だけ表示する。
+				if !game.GanonHallMelodyPlayed() {
+					melodySheetHUD.Render(ctx, width, height)
+				}
 			})
 			fmt.Println("renderer: ganon (hall) scene rendered, game loop started")
 		}
