@@ -336,6 +336,18 @@ func HorseSongPlayed() bool {
 	return horseSongPlayed
 }
 
+// TriggerHorseSummon は、馬の歌(music.HorseSongName)を正しく演奏した際と
+// 同じ処理(効果音再生+馬を呼び出す)を直接実行する。デバッグボタン
+// (web/grassland.html、bridge.goのgoSummonHorse)から、演奏なしで馬に
+// 乗った状態を試せるようにするために使う。
+func TriggerHorseSummon() {
+	horseSongPlayed = true
+	go playHorseSongAudio()
+	if horseSummoner != nil {
+		horseSummoner()
+	}
+}
+
 // ganonHallMelodyPlayed は、玉座の間の合図(music.GanonHallMelodyName)が
 // 正しく演奏されたことを示す。
 var ganonHallMelodyPlayed bool
@@ -497,11 +509,7 @@ func onMelodyRecorded(melody music.Melody) {
 	}
 
 	if name == music.HorseSongName {
-		horseSongPlayed = true
-		go playHorseSongAudio()
-		if horseSummoner != nil {
-			horseSummoner()
-		}
+		TriggerHorseSummon()
 	}
 
 	if name == music.GanonHallMelodyName {

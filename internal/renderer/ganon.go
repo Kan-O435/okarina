@@ -102,6 +102,11 @@ const (
 	ganonBossHallHeight = 2.2
 )
 
+// ganonBossHallYawDegrees は、玉座の間案のGanonBoss(人型)を、既定の向き
+// (+Z、カメラ側)からさらに左へ回転させる角度。バインドポーズがわずかに
+// 傾いて見えるため、見た目を整えるために加えている。
+const ganonBossHallYawDegrees = -25.0
+
 // GanonBackgroundVariant は、ガノンフィールドの背景デザイン案(戦場跡/
 // 玉座の間)を選ぶための識別子。それぞれ別ページ・別Link
 // (cmd/ganon-battle, cmd/ganon-hall)から固定で1つを指定して使う。
@@ -330,10 +335,16 @@ func ganonBossObject(c *Context, variant GanonBackgroundVariant) ([]Object, erro
 
 	// gltf.ParseParts()がノードのワールド変換行列を焼き込むようになった
 	// ことで、GanonBoss/GanonBossBattleとも元から+Z(カメラ・Linkのいる方)
-	// を向いた状態で読み込まれるため、追加の回転は不要になった
+	// を向いた状態で読み込まれるため、大きな補正回転は不要になった
 	// (以前はここでSketchfabのconverted形式向けの補正回転を入れていた)。
+	// 玉座の間案のGanonBoss(人型)はバインドポーズがわずかに傾いて見えるため、
+	// ganonBossHallYawDegreesだけ左へ回転させて見た目を整えている。
 	localTransform := CombinedGroundTransform(parts, 0, 0, bossHeight)
-	transform := vecmath.Translate(vecmath.NewVec3(0, bossY, bossZ)).Mul(localTransform)
+	facing := vecmath.Identity()
+	if variant == GanonBackgroundHall {
+		facing = vecmath.RotateY(vecmath.Radians(ganonBossHallYawDegrees))
+	}
+	transform := vecmath.Translate(vecmath.NewVec3(0, bossY, bossZ)).Mul(facing).Mul(localTransform)
 	objects := make([]Object, len(parts))
 	for i, part := range parts {
 		objects[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
