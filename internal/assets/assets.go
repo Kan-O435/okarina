@@ -88,3 +88,11 @@ var Horse []byte
 //
 //go:embed textures/horse-song-sheet.png
 var HorseSongSheetTexture []byte
+
+// TitleOcarina は、タイトル画面の背景でくるくる回るオカリナのGLB
+// (テクスチャ付き、Tripo3D等のセグメンテーション機能で3パーツに分かれて
+// 出力されたモデル)。internal/renderer.BuildTitleSceneがLoadGLBPartsで
+// 読み込み、パーツごとに同じ回転Transformを適用して描画する。
+//
+//go:embed models/title-ocarina.glb
+var TitleOcarina []byte
