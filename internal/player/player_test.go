@@ -159,3 +159,34 @@ func TestStartJump_IgnoredWhileAlreadyJumping(t *testing.T) {
 		t.Fatalf("expected StartJump() to be a no-op while already jumping, elapsed changed from %v to %v", elapsedBefore, s.jumpElapsed)
 	}
 }
+
+func TestSpawnAt_FacesAwayFromCamera(t *testing.T) {
+	s := &State{}
+	s.SpawnAt(5.0)
+
+	if s.Z != 5.0 {
+		t.Fatalf("expected Z=5.0, got %v", s.Z)
+	}
+	if s.Yaw != math.Pi {
+		t.Fatalf("expected Yaw=Pi (facing away from camera) right after spawning, got %v", s.Yaw)
+	}
+}
+
+func TestUpdate_WalkBobAdvancesWhileMovingAndResetsWhenIdle(t *testing.T) {
+	s := &State{}
+	s.SetDirection(Forward)
+	s.Update(0.1)
+
+	moving := s.Transform(vecmath.Identity())
+	if moving[13] <= 0 {
+		t.Fatalf("expected a positive walk-bob Y offset while walking, got %v", moving[13])
+	}
+
+	s.SetDirection(Idle)
+	s.Update(0.1)
+
+	idle := s.Transform(vecmath.Identity())
+	if idle[13] != 0 {
+		t.Fatalf("expected walk bob to reset to 0 right after stopping, got %v", idle[13])
+	}
+}

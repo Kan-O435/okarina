@@ -27,6 +27,17 @@ const (
 	jumpHeight   = 1.5 // ワールド単位(最高点)
 )
 
+// walkCycleSpeed/walkBobAmplitude/walkTiltAmplitude は、移動中(Forward/
+// Backward)の「歩いているように見せる」ための簡易アニメーション。
+// スキニングが未実装で脚を個別に動かせないため、ジャンプ(jumpOffsetY)と
+// 同じ考え方で、体全体に上下バウンド+左右への傾きを加えるだけの近似で
+// 表現する(実際のメッシュは変形しない)。
+const (
+	walkCycleSpeed    = 10.0 // ラジアン/秒。歩行中の上下バウンド・左右の傾きの速さ
+	walkBobAmplitude  = 0.06 // ワールド単位。歩行中の上下バウンドの高さ
+	walkTiltAmplitude = 0.05 // ラジアン(約2.9°)。歩行中の左右への傾き
+)
+
 // Direction はプレイヤーの現在の移動方向。
 type Direction int
 
@@ -64,6 +75,8 @@ type State struct {
 
 	jumping     bool
 	jumpElapsed float64
+
+	walkPhase float64
 }
 
 // Player はゲーム全体で共有するプレイヤー状態。
@@ -79,6 +92,15 @@ func frequencyToSemitone(freq float64) float64 {
 // ピッチ入力を介さないデバッグ操作(矢印キー等)から使う。
 func (s *State) SetDirection(d Direction) {
 	s.Direction = d
+}
+
+// SpawnAt は、指定したZ座標にプレイヤーを配置し、初期状態ではカメラ側
+// (Yaw=0、+Z)ではなくその逆(Yaw=π、フィールドの奥側)を向かせる。
+// 各フィールドのエントリーポイント(cmd/game、cmd/grassland、
+// cmd/ganon-battle、cmd/ganon-hall)が、シーン構築直後に呼ぶ。
+func (s *State) SpawnAt(z float64) {
+	s.Z = z
+	s.Yaw = math.Pi
 }
 
 // OnPitch はマイクから検出された最新のピッチ(Hz)を受け取り、直前のピッチ
@@ -147,6 +169,17 @@ func (s *State) jumpOffsetY() float64 {
 	return jumpHeight * math.Sin(math.Pi*t)
 }
 
+// walkBobOffsetY/walkTiltZ は、歩行中(walkPhaseが進んでいる間)の見た目上の
+// 上下バウンド・左右への傾き。Idle中(walkPhaseが0にリセットされている間)は
+// どちらも0になる。
+func (s *State) walkBobOffsetY() float64 {
+	return walkBobAmplitude * math.Abs(math.Sin(s.walkPhase))
+}
+
+func (s *State) walkTiltZ() float64 {
+	return walkTiltAmplitude * math.Sin(s.walkPhase)
+}
+
 // Update は経過時間dt(秒)に応じてプレイヤーの位置・向き・ジャンプの進み
 // 具合を進め、このフレームで移動したZ方向の量(ワールド単位)を返す。
 // Idle中は位置も向きも変えず、直前に移動していた方向を向いたままにする
@@ -170,18 +203,22 @@ func (s *State) Update(dt float64) float64 {
 		s.Yaw = 0
 		deltaZ = speed * dt
 	default:
+		s.walkPhase = 0
 		return 0
 	}
 	s.Z += deltaZ
+	s.walkPhase += walkCycleSpeed * dt
 	return deltaZ
 }
 
 // Transform は、localTransform(Linkモデル自身の原点補正・スケール)に、
-// 現在のワールド座標(Z)・向き(Yaw)・ジャンプ中のY方向オフセットを適用した
-// 最終的な配置行列を返す。フィールド(神殿・草原等)を問わず、Linkの見た目を
-// 毎フレーム組み立て直す際に共通で使う。
+// 現在のワールド座標(Z)・向き(Yaw)・ジャンプ中/歩行中の見た目上のY方向
+// オフセット・左右への傾きを適用した最終的な配置行列を返す。フィールド
+// (神殿・草原等)を問わず、Linkの見た目を毎フレーム組み立て直す際に
+// 共通で使う。
 func (s *State) Transform(localTransform vecmath.Mat4) vecmath.Mat4 {
-	worldPos := vecmath.Translate(vecmath.NewVec3(0, s.jumpOffsetY(), s.Z))
+	worldPos := vecmath.Translate(vecmath.NewVec3(0, s.jumpOffsetY()+s.walkBobOffsetY(), s.Z))
 	facing := vecmath.RotateY(s.Yaw)
-	return worldPos.Mul(facing).Mul(localTransform)
+	walkTilt := vecmath.RotateZ(s.walkTiltZ())
+	return worldPos.Mul(facing).Mul(walkTilt).Mul(localTransform)
 }
