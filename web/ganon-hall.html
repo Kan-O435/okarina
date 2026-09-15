@@ -41,6 +41,7 @@
 <h3>デバッグ操作</h3>
 <div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
 <button id="btn-defeat-ganon">ガノン(第一形態)を倒した(テスト)</button>
+<button id="btn-preview-collapse">崩落演出をテスト再生</button>
 
 <script src="wasm_exec.js"></script>
 <script src="audio.js"></script>
@@ -54,6 +55,12 @@
   // ボタンから直接goDefeatGanonFirstForm()を呼ぶ仮実装(btn-open-doorと同様)。
   document.getElementById('btn-defeat-ganon').addEventListener('click', () => {
     window.goDefeatGanonFirstForm();
+  });
+
+  // 崩落演出(岩が降ってくる+wipe岩が画面を覆う)だけを、戦場跡フィールド
+  // への遷移なしでその場で試せるプレビューボタン。何度でも押して確認できる。
+  document.getElementById('btn-preview-collapse').addEventListener('click', () => {
+    window.goPreviewGanonHallCollapse();
   });
 </script>
 

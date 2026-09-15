@@ -21,7 +21,8 @@ func Init() {
 	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm)")
+	js.Global().Set("goPreviewGanonHallCollapse", js.FuncOf(goPreviewGanonHallCollapse))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound)の実装をgameパッケージに
@@ -138,5 +139,14 @@ func goSetDebugDirection(this js.Value, args []js.Value) interface{} {
 func goDefeatGanonFirstForm(this js.Value, args []js.Value) interface{} {
 	game.TriggerGanonHallCollapse()
 	CallConsoleLog("bridge: goDefeatGanonFirstForm() called, starting hall collapse")
+	return nil
+}
+
+// goPreviewGanonHallCollapse はJavaScript側(玉座の間のデバッグ「テスト再生」
+// ボタン)から呼び出され、崩落演出を戦場跡フィールドへのページ遷移なしで
+// その場で再生する(何度でも試せる、動作確認用のプレビュー)。
+func goPreviewGanonHallCollapse(this js.Value, args []js.Value) interface{} {
+	game.TriggerGanonHallCollapsePreview()
+	CallConsoleLog("bridge: goPreviewGanonHallCollapse() called, previewing hall collapse")
 	return nil
 }
