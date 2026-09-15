@@ -4,6 +4,7 @@ import (
 	"math/rand"
 
 	"github.com/Kan-O435/okarina/internal/assets"
+	"github.com/Kan-O435/okarina/internal/gltf"
 	"github.com/Kan-O435/okarina/internal/vecmath"
 )
 
@@ -28,7 +29,7 @@ const (
 	poolOffsetX   = 5.0 // 道を挟んで左右に配置
 
 	linkSpawnZ       = poolCenterZ + poolHalfDepth // Linkの足元をプール手前端(カメラ側の辺)に揃える
-	linkTargetHeight = 1.4                         // KayKit Knightモデルをこの高さになるようスケールする
+	linkTargetHeight = 1.4                         // Linkモデル(internal/assets.LinkKnight)をこの高さになるようスケールする
 
 	buildingTargetHeight = 10.0 // GLBモデルをこの高さになるようスケールする
 	// buildingCenterZ: 道の奥端(pathFarZ=-16)との隙間を詰めるため手前に寄せた
@@ -79,8 +80,11 @@ var doorOpenAngleRad = vecmath.Radians(100)
 // LinkPlacement は、呼び出し側(ゲームループ)がLinkの位置・向きを毎フレーム
 // 書き換えるために必要な情報をまとめたもの。
 type LinkPlacement struct {
-	// Index は、scene.ObjectsのうちLinkに対応する要素のインデックス。
-	Index int
+	// Indices は、scene.ObjectsのうちLinkに対応する要素のインデックス一覧。
+	// LinkKnightはパーツごとに別メッシュ・別テクスチャへ分かれているため、
+	// 1体につき複数のObjectになる(呼び出し側は全インデックスに同じ
+	// Transformを設定する)。
+	Indices []int
 	// LocalTransform は、ワールド上の位置・向きを一切含まない、Link自身の
 	// 原点(足元・中心)を基準にした変換(スケール+モデル原点補正のみ)。
 	// 毎フレーム Translate(worldPos).Mul(RotateY(yaw)).Mul(LocalTransform) の
@@ -88,6 +92,30 @@ type LinkPlacement struct {
 	LocalTransform vecmath.Mat4
 	// SpawnZ はLinkの初期スポーン位置(Z座標)。
 	SpawnZ float64
+}
+
+// appendLinkObjects は、linkObject/grasslandLinkObject/ganonLinkObjectが返す
+// パーツ一覧をobjectsの末尾に追加し、対応するIndicesを含むLinkPlacementを
+// 組み立てる(3フィールド共通の処理のためここにまとめている)。
+func appendLinkObjects(objects []Object, linkObjs []Object, localTransform vecmath.Mat4, spawnZ float64) ([]Object, LinkPlacement) {
+	start := len(objects)
+	objects = append(objects, linkObjs...)
+	indices := make([]int, len(linkObjs))
+	for i := range indices {
+		indices[i] = start + i
+	}
+	return objects, LinkPlacement{Indices: indices, LocalTransform: localTransform, SpawnZ: spawnZ}
+}
+
+// SetLinkTransform は、link.Indicesが指す全てのscene.Objectsに同じtransformを
+// 設定する(Linkはパーツごとに複数Objectに分かれているため、1体分の見た目を
+// 更新するには全パーツに同じTransformを設定する必要がある)。シーン構築直後の
+// 初期姿勢(スポーン時点でカメラの逆を向かせる)の設定と、毎フレームの
+// プレイヤー移動に合わせた更新の両方から使う。
+func SetLinkTransform(scene *Scene, link LinkPlacement, transform vecmath.Mat4) {
+	for _, idx := range link.Indices {
+		scene.Objects[idx].Transform = transform
+	}
 }
 
 // BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール+
@@ -122,16 +150,11 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, link LinkPlacement, doorInde
 	}
 	objects = append(objects, templeBody)
 
-	linkObj, linkLocal, err := linkObject(c)
+	linkObjs, linkLocal, err := linkObject(c)
 	if err != nil {
 		return nil, LinkPlacement{}, -1, err
 	}
-	objects = append(objects, linkObj)
-	link = LinkPlacement{
-		Index:          len(objects) - 1,
-		LocalTransform: linkLocal,
-		SpawnZ:         linkSpawnZ,
-	}
+	objects, link = appendLinkObjects(objects, linkObjs, linkLocal, linkSpawnZ)
 
 	trees, err := treeObjects(c)
 	if err != nil {
@@ -226,25 +249,48 @@ func DoorTransform(progress float64) vecmath.Mat4 {
 	return toWorld.Mul(toHinge).Mul(rotate).Mul(fromHinge)
 }
 
-// linkObject は、KayKit Adventurers(CC0)のKnightモデル
-// (internal/assets.LinkKnight)を読み込み、フィールド手前のスポーン地点に
-// 立つよう配置する。体パーツごとに分かれた複数メッシュを結合して1体として
-// 表示するため LoadSkinnedGLBMesh を使う。アニメーション(Idle/Walking等)は
-// GLB内に含まれているが、スキニングは未実装のため現状は静止表示のみ。
+// linkObject は、Sketchfabのファンアートモデル(internal/assets.LinkKnight。
+// 詳細はinternal/assets/assets.goのコメント参照)を読み込み、フィールド手前の
+// スポーン地点に立つよう配置する。スキンは無くパーツごとに別メッシュ・別
+// テクスチャへ分かれているため、GanonBoss等と同様にLoadGLBParts
+// (ここではgltf.ParseParts+buildModel)/CombinedGroundTransformで読み込み、
+// パーツ数ぶんのObjectを返す。アニメーションは未実装のため静止表示のみ。
 //
 // 戻り値のlocalTransformは、ワールド座標(0, 0)に置いた場合の変換
 // (=スケール+モデル原点補正のみ)で、呼び出し側が毎フレーム位置・向きを
 // 更新する際の土台として使う。
-func linkObject(c *Context) (obj Object, localTransform vecmath.Mat4, err error) {
-	model, err := c.LoadSkinnedGLBMesh(assets.LinkKnight)
+func linkObject(c *Context) (objs []Object, localTransform vecmath.Mat4, err error) {
+	parts, err := loadLinkParts(c)
 	if err != nil {
-		return Object{}, vecmath.Mat4{}, err
+		return nil, vecmath.Mat4{}, err
 	}
 
-	localTransform = model.GroundTransform(0, 0, linkTargetHeight)
+	localTransform = CombinedGroundTransform(parts, 0, 0, linkTargetHeight)
 	transform := vecmath.Translate(vecmath.NewVec3(0, 0, linkSpawnZ)).Mul(localTransform)
-	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}
-	return obj, localTransform, nil
+	objs = make([]Object, len(parts))
+	for i, part := range parts {
+		objs[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
+	}
+	return objs, localTransform, nil
+}
+
+// loadLinkParts は、internal/assets.LinkKnightをパーツごとのModelとして読み込む。
+// 神殿・草原・ガノンの3フィールドすべてのLink配置関数(linkObject/
+// grasslandLinkObject/ganonLinkObject)から共通で呼ばれる。
+func loadLinkParts(c *Context) ([]*Model, error) {
+	prims, err := gltf.ParseParts(assets.LinkKnight)
+	if err != nil {
+		return nil, err
+	}
+	parts := make([]*Model, len(prims))
+	for i := range prims {
+		model, err := c.buildModel(&prims[i])
+		if err != nil {
+			return nil, err
+		}
+		parts[i] = model
+	}
+	return parts, nil
 }
 
 // treePlacement は1本の木の配置(中心のXZ座標と目標の高さ)を表す。

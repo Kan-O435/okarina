@@ -161,16 +161,11 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projecti
 
 	objects = append(objects, grasslandObstacleObjects(c)...)
 
-	linkObj, linkLocal, err := grasslandLinkObject(c)
+	linkObjs, linkLocal, err := grasslandLinkObject(c)
 	if err != nil {
 		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
-	objects = append(objects, linkObj)
-	link = LinkPlacement{
-		Index:          len(objects) - 1,
-		LocalTransform: linkLocal,
-		SpawnZ:         grasslandLinkZ,
-	}
+	objects, link = appendLinkObjects(objects, linkObjs, linkLocal, grasslandLinkZ)
 
 	// 透過オブジェクト(後光・雲)は、不透明なオブジェクトがすべて描かれた
 	// 後に描画する。先に描くと、まだ何も描かれていない背景色と合成されて
@@ -376,22 +371,25 @@ func grasslandTreeObjects(c *Context) ([]Object, error) {
 	return objects, nil
 }
 
-// grasslandLinkObject は、神殿フィールドと同じKayKit Knightモデル
+// grasslandLinkObject は、神殿フィールドと同じLinkモデル
 // (internal/assets.LinkKnight)を、道のいちばん手前(grasslandLinkZ)に配置
 // する。神殿の扉を抜けてきた直後、という体で置いている。demo.goのlinkObject
 // と同様、ワールド位置を含まないlocalTransform(モデル原点補正+スケール)を
 // 別に返し、呼び出し側が毎フレームプレイヤーの位置・向きと組み合わせて
 // Transformを再構築できるようにする。
-func grasslandLinkObject(c *Context) (obj Object, localTransform vecmath.Mat4, err error) {
-	model, err := c.LoadSkinnedGLBMesh(assets.LinkKnight)
+func grasslandLinkObject(c *Context) (objs []Object, localTransform vecmath.Mat4, err error) {
+	parts, err := loadLinkParts(c)
 	if err != nil {
-		return Object{}, vecmath.Mat4{}, err
+		return nil, vecmath.Mat4{}, err
 	}
 
-	localTransform = model.GroundTransform(0, 0, linkTargetHeight)
+	localTransform = CombinedGroundTransform(parts, 0, 0, linkTargetHeight)
 	transform := vecmath.Translate(vecmath.NewVec3(0, 0, grasslandLinkZ)).Mul(localTransform)
-	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}
-	return obj, localTransform, nil
+	objs = make([]Object, len(parts))
+	for i, part := range parts {
+		objs[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
+	}
+	return objs, localTransform, nil
 }
 
 // horseTargetHeight は、馬(internal/assets.Horse)をこの高さになるよう
