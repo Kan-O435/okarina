@@ -37,13 +37,12 @@ func main() {
 		if err != nil {
 			fmt.Println("renderer: failed to build ganon scene:", err)
 		} else {
-			player.Player.Z = link.SpawnZ
+			player.Player.SpawnAt(link.SpawnZ)
+			renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
 
 			ctx.RunLoop(func(dt float64) {
-				deltaZ := player.Player.Update(dt)
-				if deltaZ != 0 {
-					scene.Objects[link.Index].Transform = player.Player.Transform(link.LocalTransform)
-				}
+				player.Player.Update(dt)
+				renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
 				scene.Render(ctx)
 			})
 			fmt.Println("renderer: ganon (battle) scene rendered, game loop started")

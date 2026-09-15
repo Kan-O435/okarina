@@ -39,7 +39,8 @@ func main() {
 			if err != nil {
 				fmt.Println("renderer: failed to build grassland scene:", err)
 			} else {
-				player.Player.Z = link.SpawnZ
+				player.Player.SpawnAt(link.SpawnZ)
+				renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
 				transitioned := false
 				horseIndex := -1
 				var horseLocalTransform vecmath.Mat4
@@ -87,21 +88,20 @@ func main() {
 						}
 					}
 
-					// ジャンプ中は、前後に動いていなくても(deltaZ==0でも)
-					// 見た目のY方向オフセットが変わり続けるため、その間は
-					// 毎フレームTransformを更新する。
-					if deltaZ != 0 || player.Player.IsJumping() {
-						linkTransform := player.Player.Transform(link.LocalTransform)
-						if horseIndex >= 0 {
-							// 馬に乗っている間は、Linkを持ち上げて背に
-							// 座っているように見せる。位置・向きは馬と共通
-							// (player.Player)なので、進行方向にあわせて
-							// 一緒に向きが変わる。
-							linkTransform = mountOffset.Mul(linkTransform)
-							scene.Objects[horseIndex].Transform = player.Player.Transform(horseLocalTransform)
-						}
-						scene.Objects[link.Index].Transform = linkTransform
+					// ジャンプ・歩行バウンド中は、前後に動いていなくても
+					// (deltaZ==0でも)見た目のY方向オフセットや傾きが変わり
+					// 続ける(止まった直後に途中の姿勢のまま固まるのを防ぐ
+					// ため)、毎フレーム無条件にTransformを更新する。
+					linkTransform := player.Player.Transform(link.LocalTransform)
+					if horseIndex >= 0 {
+						// 馬に乗っている間は、Linkを持ち上げて背に
+						// 座っているように見せる。位置・向きは馬と共通
+						// (player.Player)なので、進行方向にあわせて
+						// 一緒に向きが変わる。
+						linkTransform = mountOffset.Mul(linkTransform)
+						scene.Objects[horseIndex].Transform = player.Player.Transform(horseLocalTransform)
 					}
+					renderer.SetLinkTransform(scene, link, linkTransform)
 					scene.Render(ctx)
 
 					// Linkが右奥の木のあたりまで進んだら、次のフィールド
