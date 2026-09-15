@@ -446,3 +446,69 @@ func TestOnMIDIEvent_NoteOffDoesNotTriggerTitleStart(t *testing.T) {
 		t.Fatalf("expected no trigger for a Note Off, got %d", triggered)
 	}
 }
+
+func TestDebugTriggerTitleStart_CallsRegisteredTrigger(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	DebugTriggerTitleStart()
+
+	if triggered != 1 {
+		t.Fatalf("expected the registered title start trigger to be called once, got %d", triggered)
+	}
+}
+
+func TestDebugTriggerTitleStart_NilTriggerDoesNothing(t *testing.T) {
+	SetTitleStartTrigger(nil)
+
+	DebugTriggerTitleStart() // パニックしないことを確認する
+}
+
+func TestDebugTriggerJump_CallsRegisteredTrigger(t *testing.T) {
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	DebugTriggerJump()
+
+	if triggered != 1 {
+		t.Fatalf("expected the registered jump trigger to be called once, got %d", triggered)
+	}
+}
+
+func TestDebugTriggerJump_NilTriggerDoesNothing(t *testing.T) {
+	SetJumpTrigger(nil)
+
+	DebugTriggerJump() // パニックしないことを確認する
+}
+
+func TestDebugTriggerGanonHallMelody_PlaysConfirmationThenTriggersCollapse(t *testing.T) {
+	ganonHallMelodyPlayed = false
+	defer setSleepHookForTest(func(time.Duration) {})()
+
+	fanfareCalls := 0
+	done := make(chan struct{})
+	SetPlayConfirmationFanfareFunc(func() { fanfareCalls++ })
+	SetGanonHallCollapseTrigger(func() { close(done) })
+	defer func() {
+		SetPlayConfirmationFanfareFunc(nil)
+		SetGanonHallCollapseTrigger(nil)
+	}()
+
+	DebugTriggerGanonHallMelody()
+
+	if !GanonHallMelodyPlayed() {
+		t.Fatal("expected GanonHallMelodyPlayed() to be true immediately")
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ganon hall collapse trigger was not called within timeout")
+	}
+
+	if fanfareCalls != 1 {
+		t.Fatalf("expected the confirmation fanfare to be played once before the collapse, got %d calls", fanfareCalls)
+	}
+}

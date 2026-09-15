@@ -84,6 +84,14 @@ if (!WebAssembly) {
         setTimeout(() => stopNote(60), 500);
       });
 
+      // デバッグ用: 演奏無しでも、Oキーで光のプレリュードを正しく演奏した
+      // のと同じ効果(確認音→崩落演出)を試せるようにする。
+      window.addEventListener('keydown', (event) => {
+        if ((event.key === 'o' || event.key === 'O') && window.goDebugTriggerGanonHallMelody) {
+          window.goDebugTriggerGanonHallMelody();
+        }
+      });
+
       initMIDI();
     })
     .catch((err) => {

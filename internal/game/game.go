@@ -194,6 +194,15 @@ func SetJumpTrigger(f func()) {
 	jumpTrigger = f
 }
 
+// DebugTriggerJump は、オタマトーン無しにキーボードから低い音を鳴らして
+// ジャンプジェスチャーが成立したのと同じ効果を発生させるデバッグ用
+// エントリーポイント(web/grassland.jsのOキー)。
+func DebugTriggerJump() {
+	if jumpTrigger != nil {
+		jumpTrigger()
+	}
+}
+
 // updateJumpGesture は、最新のピッチ(Hz)から低い音の立ち上がり(無音・
 // 高い音から低い音に変わった瞬間)を検出し、検出したら即座にjumpTrigger
 // を呼ぶ。同じ低い音を鳴らし続けている間は再度発火しない。
@@ -265,6 +274,15 @@ var titleStartTrigger func()
 // 登録する。
 func SetTitleStartTrigger(f func()) {
 	titleStartTrigger = f
+}
+
+// DebugTriggerTitleStart は、MIDIキーボード/オカリナ無しにキーボードから
+// 「ド(C)」を弾いたのと同じ効果を発生させるデバッグ用エントリーポイント
+// (web/title.jsのOキー)。
+func DebugTriggerTitleStart() {
+	if titleStartTrigger != nil {
+		titleStartTrigger()
+	}
 }
 
 // OnMIDIEvent はJS-Go Bridge経由で受け取ったMIDIイベントを
@@ -496,6 +514,15 @@ func playGanonHallMelodyAudio() {
 
 	playConfirmationFanfare(fanfare, sleep)
 	TriggerGanonHallCollapse()
+}
+
+// DebugTriggerGanonHallMelody は、演奏無しにキーボードから光のプレリュード
+// を正しく演奏したのと同じ効果を発生させるデバッグ用エントリーポイント
+// (web/ganon-hall.jsのOキー)。onMelodyRecordedがGanonHallMelodyNameを
+// 認識した場合と全く同じ処理(確認音→崩落演出)を行う。
+func DebugTriggerGanonHallMelody() {
+	ganonHallMelodyPlayed = true
+	go playGanonHallMelodyAudio()
 }
 
 // playConfirmationFanfare は、時の歌・馬の歌を正しく演奏した際の確認音
