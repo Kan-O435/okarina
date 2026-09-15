@@ -1,6 +1,8 @@
 package renderer
 
 import (
+	"fmt"
+
 	"github.com/Kan-O435/okarina/internal/assets"
 	"github.com/Kan-O435/okarina/internal/gltf"
 	"github.com/Kan-O435/okarina/internal/vecmath"
@@ -507,4 +509,131 @@ func GanonHallSmokeObject(c *Context) (Object, error) {
 	verts := centeredQuadVertices(1, 1)
 	mesh := c.NewMesh(verts, quadUVsCropped(0, 0, 1, 1), quadIndices())
 	return Object{Mesh: mesh, Texture: texture, Color: ganonHallSmokeColor}, nil
+}
+
+// --- ここから、ganon-battleフィールド(戦場跡案)のGanon最終形態撃破
+// カットシーン(嵐→雷→爆発→白フェード)用の演出パーツ。カメラは
+// ganonCameraViewで固定のため、玉座の間の第一形態撃破演出と同様、爆発時に
+// ganonBossObjectそのものを隠す仕組みは作らず、煙玉で覆うだけに留める
+// (BuildGanonScene/ganonBossObjectには一切手を入れない)。
+
+// ganonBattleStormCloudColor は、嵐雲(internal/assets.GanonStormCloud)に
+// 付ける色。元のアセットは明るい水色だが、暗い青灰色に着色して不穏な
+// 嵐の雲として使う。
+var ganonBattleStormCloudColor = vecmath.NewVec3(0.22, 0.24, 0.3)
+
+// ganonBattleStormCloudPlacements は、Ganon最終形態撃破カットシーンの
+// 冒頭でアリーナ上空に集まる嵐雲の配置一覧。GanonStormCloud(7種類)の
+// うちいくつかを選び、ganonBossBattleZ(-38)付近の上空・奥に大きめに
+// 配置している。templeCloudPlacement(demo.go)と全く同じ構造体を流用する
+// (PartIndexはgltf.ParseParts()が返す順序)。
+var ganonBattleStormCloudPlacements = []templeCloudPlacement{
+	{PartIndex: 0, X: -14, Y: 22, Z: -42, Height: 11},
+	{PartIndex: 1, X: 10, Y: 26, Z: -48, Height: 13},
+	{PartIndex: 2, X: -4, Y: 30, Z: -55, Height: 12},
+	{PartIndex: 3, X: 16, Y: 20, Z: -34, Height: 9},
+	{PartIndex: 5, X: -18, Y: 24, Z: -30, Height: 10},
+}
+
+// GanonBattleStormCloudObjects は、internal/assets.GanonStormCloudから
+// ganonBattleStormCloudPlacementsで指定した雲を選び、
+// ganonBattleStormCloudColorで着色して空に配置する。demo.goの
+// templeCloudObjectsと全く同じ構成(GroundTransformで各雲を独立に
+// スケール・配置)。
+func GanonBattleStormCloudObjects(c *Context) ([]Object, error) {
+	prims, err := gltf.ParseParts(assets.GanonStormCloud)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]Object, 0, len(ganonBattleStormCloudPlacements))
+	for _, p := range ganonBattleStormCloudPlacements {
+		if p.PartIndex < 0 || p.PartIndex >= len(prims) {
+			continue
+		}
+		model, err := c.buildModel(&prims[p.PartIndex])
+		if err != nil {
+			return nil, err
+		}
+		localTransform := model.GroundTransform(0, 0, p.Height)
+		transform := vecmath.Translate(vecmath.NewVec3(p.X, p.Y, p.Z)).Mul(localTransform)
+		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: ganonBattleStormCloudColor})
+	}
+	return objects, nil
+}
+
+// ganonBattleLightningColor は、雷(internal/assets.GanonLightning)に付ける
+// 色。素材そのものが明るい青白色の発光素材のため、ほぼ白に近い色を掛けて
+// 素材の見た目をそのまま活かす。
+var ganonBattleLightningColor = vecmath.NewVec3(0.85, 0.9, 1.0)
+
+// GanonBattleLightningStrikeY/GanonBattleBossZ は、雷がGanonに落ちる着弾点の
+// ワールドY/Z座標(X=0、GanonBattleCameraY/Zと同様にcmd/ganon-battle/main.go
+// が演出のTransformを組み立てるために公開する)。Yはganonの頭の高さ
+// (ganonBossBattleY+ganonBossBattleHeight)、ZはganonBossBattleZのエイリアス。
+// ganonBattleLightningHeight は、雷の目標の高さ(着弾点から見上げた
+// 見た目の長さ)。ganonBattleStormCloudPlacementsの雲の高さ(Y20〜30)まで
+// 届くよう、着弾点から十分な高さを持たせている。
+const (
+	GanonBattleLightningStrikeY = ganonBossBattleY + ganonBossBattleHeight
+	GanonBattleBossZ            = ganonBossBattleZ
+	ganonBattleLightningHeight  = 16.0
+)
+
+// ganonBattleLightningPartIndex は、GanonLightning(3種類の分岐した雷
+// メッシュ)のうち、最も縦長・1本に近い見た目のものを選んだインデックス
+// (gltf.ParseParts()が返す順序、バウンディングボックスを確認して選んだ)。
+const ganonBattleLightningPartIndex = 2
+
+// GanonBattleLightningObject は、internal/assets.GanonLightningから
+// ganonBattleLightningPartIndexのパーツを選び、Ganonの頭上
+// (X=0, Z=GanonBattleBossZ、Y=GanonBattleLightningStrikeYを底面として
+// 上に伸びる)に配置する。呼び出し側(cmd/ganon-battle/main.go)は、
+// 返されたlocalTransformを使って
+// Translate(0, GanonBattleLightningStrikeY, GanonBattleBossZ).Mul(localTransform)
+// でTransformを組み立てる(他の演出パーツと同じ構成)。
+func GanonBattleLightningObject(c *Context) (obj Object, localTransform vecmath.Mat4, err error) {
+	prims, err := gltf.ParseParts(assets.GanonLightning)
+	if err != nil {
+		return Object{}, vecmath.Mat4{}, err
+	}
+	if ganonBattleLightningPartIndex >= len(prims) {
+		return Object{}, vecmath.Mat4{}, fmt.Errorf("renderer: GanonLightning has no part %d", ganonBattleLightningPartIndex)
+	}
+	model, err := c.buildModel(&prims[ganonBattleLightningPartIndex])
+	if err != nil {
+		return Object{}, vecmath.Mat4{}, err
+	}
+	localTransform = model.GroundTransform(0, 0, ganonBattleLightningHeight)
+	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Transform: localTransform, Color: ganonBattleLightningColor}
+	return obj, localTransform, nil
+}
+
+// GanonBattleExplosionSmokePlacements は、Ganon最終形態を倒した際に
+// 立ち上る爆発煙の配置一覧。GanonHallSmokePuffPlacement(玉座の間の第一
+// 形態撃破演出と同じ構造体、GanonHallSmokeObjectと組み合わせて使う)を
+// 流用する。カメラが固定であることを利用し、ganonBossBattle(戦場跡案の
+// ボス、Z=ganonBossBattleZ)を画面から覆い隠せるよう、玉座の間より
+// 大きめ・多めに配置している。
+var GanonBattleExplosionSmokePlacements = []GanonHallSmokePuffPlacement{
+	{X: -1.2, Y: ganonBossBattleY + ganonBossBattleHeight*0.3, Z: ganonBossBattleZ + 0.6, StartHalfSize: 0.5, EndHalfSize: 3.2, RiseHeight: 2.4},
+	{X: 1.0, Y: ganonBossBattleY + ganonBossBattleHeight*0.5, Z: ganonBossBattleZ - 0.3, StartHalfSize: 0.5, EndHalfSize: 3.6, RiseHeight: 3.0},
+	{X: 0.0, Y: ganonBossBattleY + ganonBossBattleHeight*0.7, Z: ganonBossBattleZ + 0.3, StartHalfSize: 0.4, EndHalfSize: 3.0, RiseHeight: 2.7},
+	{X: -0.6, Y: ganonBossBattleY + ganonBossBattleHeight*0.9, Z: ganonBossBattleZ - 0.6, StartHalfSize: 0.4, EndHalfSize: 2.8, RiseHeight: 3.3},
+	{X: 1.6, Y: ganonBossBattleY + ganonBossBattleHeight*0.2, Z: ganonBossBattleZ + 0.9, StartHalfSize: 0.5, EndHalfSize: 3.0, RiseHeight: 2.0},
+}
+
+// GanonBattleExplosionDebrisPlacements は、爆発で外側へ飛び散る岩片の
+// 配置一覧。GanonHallCollapseRockPlacement(玉座の間の崩落演出と同じ
+// 構造体、GanonHallCollapseRockObjectと組み合わせて使う)を流用する。
+// X/Zはそれぞれの岩片が外側へ飛んでいく先(ganonBossBattleZ付近を中心に
+// 散らした位置)を表し、実際の「中心から外側へ飛んでから落ちる」動きは
+// 呼び出し側(cmd/ganon-battle/main.go)が毎フレーム計算する。
+var GanonBattleExplosionDebrisPlacements = []GanonHallCollapseRockPlacement{
+	{X: -2.4, Z: ganonBossBattleZ + 2.0, HalfSize: 0.5},
+	{X: 2.0, Z: ganonBossBattleZ - 1.6, HalfSize: 0.6},
+	{X: -1.2, Z: ganonBossBattleZ - 2.4, HalfSize: 0.4},
+	{X: 2.8, Z: ganonBossBattleZ + 1.2, HalfSize: 0.5},
+	{X: 0.4, Z: ganonBossBattleZ + 2.8, HalfSize: 0.45},
+	{X: -3.0, Z: ganonBossBattleZ - 0.4, HalfSize: 0.55},
 }

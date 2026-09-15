@@ -85,3 +85,9 @@ func (p *Program) SetUniformSampler(c *Context, name string, textureUnit int) {
 	loc := c.gl.Call("getUniformLocation", p.handle, name)
 	c.gl.Call("uniform1i", loc, textureUnit)
 }
+
+// SetUniformFloat はfloat型のuniform変数に値を設定する。Use済みであること。
+func (p *Program) SetUniformFloat(c *Context, name string, v float64) {
+	loc := c.gl.Call("getUniformLocation", p.handle, name)
+	c.gl.Call("uniform1f", loc, v)
+}

@@ -103,6 +103,7 @@ func (h *HUD) Render(c *Context, canvasWidth, canvasHeight int) {
 	h.Texture.Bind(c)
 	h.Program.SetUniformMat4(c, "uMVP", ortho)
 	h.Program.SetUniformVec3(c, "uColor", vecmath.NewVec3(1, 1, 1))
+	h.Program.SetUniformFloat(c, "uAlpha", 1.0)
 	h.Mesh.Draw(c, h.Program)
 
 	c.EnableDepthTest()

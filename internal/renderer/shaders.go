@@ -15,13 +15,19 @@ void main() {
 }
 `
 
+// uAlphaは、雷の閃光・白フェード(internal/renderer/overlay.go参照)のように、
+// テクスチャのアルファ値とは別に描画全体の不透明度を外部からアニメーション
+// させたい場合だけに使うuniform。それ以外の通常描画では常に1.0を明示的に
+// 設定する(Scene.Render/HUD.Render参照。WebGLのuniform初期値は0.0のため、
+// 設定を怠ると全描画が透明になってしまう点に注意)。
 const basicFragmentShaderSrc = `
 precision mediump float;
 uniform sampler2D uTexture;
 uniform vec3 uColor;
+uniform float uAlpha;
 varying vec2 vTexCoord;
 void main() {
     vec4 texColor = texture2D(uTexture, vTexCoord);
-    gl_FragColor = vec4(texColor.rgb * uColor, texColor.a);
+    gl_FragColor = vec4(texColor.rgb * uColor, texColor.a * uAlpha);
 }
 `

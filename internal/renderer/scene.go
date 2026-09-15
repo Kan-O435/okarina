@@ -36,6 +36,7 @@ func (s *Scene) Render(c *Context) {
 		mvp := s.ViewProjection.Mul(obj.Transform)
 		s.Program.SetUniformMat4(c, "uMVP", mvp)
 		s.Program.SetUniformVec3(c, "uColor", obj.Color)
+		s.Program.SetUniformFloat(c, "uAlpha", 1.0)
 		obj.Mesh.Draw(c, s.Program)
 	}
 }
