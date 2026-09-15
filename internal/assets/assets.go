@@ -55,3 +55,13 @@ var GanonBattleScene []byte
 //
 //go:embed models/ganon-hall.glb
 var GanonHall []byte
+
+// GanonBoss は、ガノンフィールドの背景の手前に配置するボス役のGLB
+// (CC0、KayKit Adventurers Character PackのBarbarianモデルを流用)。
+// 任天堂の実際のガノンドロフのデザインをそのまま模倣することは避け、
+// 「着想を得た」大柄で威圧的なキャラクターとして、体パーツごとに分かれた
+// スキン付きモデル(LinkKnightと同じ構造)をそのまま使う
+// (internal/renderer/ganon.goのganonBossObject、LoadSkinnedGLBMesh参照)。
+//
+//go:embed models/ganon-boss.glb
+var GanonBoss []byte

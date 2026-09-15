@@ -37,8 +37,30 @@ var ganonGroundColor = vecmath.NewVec3(0.4, 0.2, 0.14)
 // ganonLinkZ は、Linkをカメラのすぐ手前に立たせておく位置。
 const ganonLinkZ = -20.0
 
-// GanonBackgroundVariant は、ガノンフィールドの背景として比較中の
-// 2つのデザイン案を切り替えるための識別子。
+// ganonBossZ/Y/Height は、ボス(internal/assets.GanonBoss)を、背景ジオラマ
+// (internal/assets.GanonBattleScene)自体の地面(tripo_part_0、平らな
+// アリーナ地面ではなく、持ち込んだジオラマ側の岩場)の上に立たせる位置・
+// 高さ。
+//
+// このジオラマは奥へ行くほど地面が盛り上がる地形(手前のZ=-27付近は
+// ほぼY=0だが、Z=-33付近ではY≈1.5でほぼ平ら)になっている。GLBの
+// 生データ(GroundTransform適用前のローカル座標)を直接調べ、X≈0・
+// Z≈-33の地点の頂点群のワールドY(モデルのスケール後)がおよそ1.48〜1.52
+// で揃っていることを確認し、その値(1.5)を採用した。ganonBossZ=-33は
+// この「奥の壁より手前・アリーナ地面より奥」の範囲で、この平らな段差に
+// ちょうど乗る位置。
+//
+// Link(linkTargetHeight=1.4)よりはっきり大柄に見えるよう、高さはその
+// 約2.6倍の3.6にしている。
+const (
+	ganonBossZ      = -33.0
+	ganonBossY      = 1.5
+	ganonBossHeight = 3.6
+)
+
+// GanonBackgroundVariant は、ガノンフィールドの背景デザイン案(戦場跡/
+// 玉座の間)を選ぶための識別子。それぞれ別ページ・別Link
+// (cmd/ganon-battle, cmd/ganon-hall)から固定で1つを指定して使う。
 type GanonBackgroundVariant int
 
 const (
@@ -72,6 +94,12 @@ func BuildGanonScene(c *Context, variant GanonBackgroundVariant) (scene *Scene, 
 		return nil, LinkPlacement{}, err
 	}
 	objects = append(objects, background...)
+
+	boss, err := ganonBossObject(c)
+	if err != nil {
+		return nil, LinkPlacement{}, err
+	}
+	objects = append(objects, boss...)
 
 	linkObj, linkLocal, err := ganonLinkObject(c)
 	if err != nil {
@@ -145,9 +173,12 @@ func ganonCameraView(variant GanonBackgroundVariant) vecmath.Mat4 {
 	// しようとすると横方向は画面からはみ出すほど寄る必要がある。カメラの
 	// 高さを背景の縦方向の中心(Y=5、高さ10の半分)に合わせたうえで寄せ、
 	// 上下方向の隙間が出ないようにしている。
+	//
+	// カメラをX=3だけ右にずらし、Z方向にも3だけ前(奥へ)寄せている
+	// (視点・注視点を同じだけ動かし、視線の向き自体は変えていない)。
 	return vecmath.LookAt(
-		vecmath.NewVec3(0, 5, -17),
-		vecmath.NewVec3(0, 5, -35),
+		vecmath.NewVec3(3, 5, -20),
+		vecmath.NewVec3(3, 5, -38),
 		vecmath.NewVec3(0, 1, 0),
 	)
 }
@@ -185,6 +216,23 @@ func ganonBackgroundObjects(c *Context, variant GanonBackgroundVariant) ([]Objec
 		objects[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
 	}
 	return objects, nil
+}
+
+// ganonBossObject は、背景ジオラマの地形の上(ganonBossZ/Y)にボス
+// (internal/assets.GanonBoss)を配置する。LinkKnightと同じく体パーツごとに
+// 分かれたスキン付きモデルのため、LoadSkinnedGLBMeshで全パーツを1つに
+// 結合して読み込む。GroundTransformは足元をY=0に置くため、そのあとに
+// ganonBossY分だけワールド空間で持ち上げて、ジオラマの地面の高さに
+// 合わせている。現時点では静止しているだけで、専用の行動・アニメーションは
+// まだ無い。
+func ganonBossObject(c *Context) ([]Object, error) {
+	model, err := c.LoadSkinnedGLBMesh(assets.GanonBoss)
+	if err != nil {
+		return nil, err
+	}
+
+	transform := vecmath.Translate(vecmath.NewVec3(0, ganonBossY, 0)).Mul(model.GroundTransform(0, ganonBossZ, ganonBossHeight))
+	return []Object{{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}}, nil
 }
 
 // ganonLinkObject は、神殿・草原フィールドと同じKayKit Knightモデル
