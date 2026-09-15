@@ -73,27 +73,75 @@ const (
 // あったため、これを避けるための余白。
 const grasslandObstacleClampMargin = 0.01
 
+// grasslandCameraEye/Target/Up は、馬に乗る前の見下ろし気味の固定カメラ。
+// GrasslandCameraTransitionDuration秒かけて、馬に乗った後は横視点カメラ
+// (GrasslandSideCameraEyeTarget)へ滑らかに遷移する(cmd/grassland/main.go
+// 参照)。
+var (
+	grasslandCameraEye    = vecmath.NewVec3(0, 8, 12)
+	grasslandCameraTarget = vecmath.NewVec3(0, 0, -10)
+	grasslandCameraUp     = vecmath.NewVec3(0, 1, 0)
+)
+
+// GrasslandCameraTransitionDuration は、馬に乗ってから横視点カメラへの
+// 切り替えが完了するまでの時間(秒)。瞬間的に切り替わると酔いやすい・
+// 状況が飲み込みにくいため、この時間をかけてカメラ位置・注視点を線形補間
+// する。
+const GrasslandCameraTransitionDuration = 1.5
+
+// GrasslandSideCameraDistance/Height/LookHeight は、馬に乗った後のマリオの
+// ような横視点カメラのパラメータ。X軸の正方向から見下ろすことで、
+// プレイヤーの前後移動(Z軸)がそのまま画面の左右移動に見える構図になり、
+// 障害物のジャンプ(Y方向)が縦の動きとしてはっきり見えるようになる
+// (アスレチック的な難易度を作りやすくするため)。
+const (
+	GrasslandSideCameraDistance   = 10.0
+	GrasslandSideCameraHeight     = 3.0
+	GrasslandSideCameraLookHeight = 1.3
+)
+
+// GrasslandDefaultCameraEyeTarget は、馬に乗る前の固定カメラのeye・target
+// を返す。カメラ遷移の補間の開始値として使う。
+func GrasslandDefaultCameraEyeTarget() (eye, target vecmath.Vec3) {
+	return grasslandCameraEye, grasslandCameraTarget
+}
+
+// GrasslandSideCameraEyeTarget は、プレイヤーの現在のZ座標(playerZ)に
+// 追従する、横視点カメラのeye・targetを返す。
+func GrasslandSideCameraEyeTarget(playerZ float64) (eye, target vecmath.Vec3) {
+	eye = vecmath.NewVec3(GrasslandSideCameraDistance, GrasslandSideCameraHeight, playerZ)
+	target = vecmath.NewVec3(0, GrasslandSideCameraLookHeight, playerZ)
+	return eye, target
+}
+
+// GrasslandCameraUp は、草原フィールドのカメラが常に使う上方向ベクトル。
+func GrasslandCameraUp() vecmath.Vec3 {
+	return grasslandCameraUp
+}
+
+// grasslandProjection は、草原フィールドの透視投影行列を組み立てる。
+// FOV: 55°では城をこれ以上手前・大きくする余白が無くなったため65°に
+// 広げ、画面上端までの余白を確保している(木の配置はまだ十分内側にある
+// ため、広げても画面外に出ることはない)。
+func grasslandProjection(aspect float64) vecmath.Mat4 {
+	return vecmath.Perspective(vecmath.Radians(65), aspect, 0.1, 150)
+}
+
 // BuildGrasslandScene は、草原フィールドの土台(地面・道・Link)を配置した
 // Sceneを組み立てる。戻り値のLinkPlacementは、demo.goの神殿フィールドと
 // 同様、プレイヤー移動に合わせて呼び出し側がLinkのTransformを書き換える
-// ために使う。
-func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, err error) {
+// ために使う。projectionは、呼び出し側が馬に乗った後のカメラ遷移で
+// 毎フレームScene.ViewProjectionを組み直すために別途返す。
+func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projection vecmath.Mat4, err error) {
 	program, err := c.NewProgram(basicVertexShaderSrc, basicFragmentShaderSrc)
 	if err != nil {
-		return nil, LinkPlacement{}, err
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
 
 	width, height := c.CanvasSize()
 	aspect := float64(width) / float64(height)
-	// FOV: 55°では城をこれ以上手前・大きくする余白が無くなったため65°に
-	// 広げ、画面上端までの余白を確保している(木の配置はまだ十分内側にある
-	// ため、広げても画面外に出ることはない)。
-	projection := vecmath.Perspective(vecmath.Radians(65), aspect, 0.1, 150)
-	view := vecmath.LookAt(
-		vecmath.NewVec3(0, 8, 12), // カメラ位置: 地面を見渡せる高さ・距離
-		vecmath.NewVec3(0, 0, -10),
-		vecmath.NewVec3(0, 1, 0),
-	)
+	projection = grasslandProjection(aspect)
+	view := vecmath.LookAt(grasslandCameraEye, grasslandCameraTarget, grasslandCameraUp)
 
 	// まず不透明なオブジェクトをすべて配置する(深度テストがあるため、
 	// 互いの前後関係は描画順によらず正しく処理される)。
@@ -101,13 +149,13 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, err erro
 
 	castle, err := grasslandCastleObject(c)
 	if err != nil {
-		return nil, LinkPlacement{}, err
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
 	objects = append(objects, castle)
 
 	trees, err := grasslandTreeObjects(c)
 	if err != nil {
-		return nil, LinkPlacement{}, err
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
 	objects = append(objects, trees...)
 
@@ -115,7 +163,7 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, err erro
 
 	linkObj, linkLocal, err := grasslandLinkObject(c)
 	if err != nil {
-		return nil, LinkPlacement{}, err
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
 	objects = append(objects, linkObj)
 	link = LinkPlacement{
@@ -134,7 +182,7 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, err erro
 	// 透明な部分が奥のものを誤って隠してしまう。
 	skyObjects, err := grasslandSkyObjects(c)
 	if err != nil {
-		return nil, LinkPlacement{}, err
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
 	objects = append(objects, skyObjects...)
 
@@ -142,7 +190,7 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, err erro
 		Program:        program,
 		ViewProjection: projection.Mul(view),
 		Objects:        objects,
-	}, link, nil
+	}, link, projection, nil
 }
 
 func grasslandGroundObject(c *Context) Object {

@@ -35,7 +35,7 @@ func main() {
 			ctx.EnableBlend()                    // 城の後ろの後光(透過テクスチャ)を正しく合成するため
 			ctx.ClearColor(0.6, 0.48, 0.65, 1.0) // 薄紫の不穏な空
 
-			scene, link, err := renderer.BuildGrasslandScene(ctx)
+			scene, link, projection, err := renderer.BuildGrasslandScene(ctx)
 			if err != nil {
 				fmt.Println("renderer: failed to build grassland scene:", err)
 			} else {
@@ -43,6 +43,13 @@ func main() {
 				transitioned := false
 				horseIndex := -1
 				var horseLocalTransform vecmath.Mat4
+
+				// cameraTransitionElapsed は、馬に乗ってから経過した時間(秒)。
+				// 馬に乗った瞬間にカメラを一気に切り替えると視点が急に変わって
+				// 分かりにくいため、renderer.GrasslandCameraTransitionDuration
+				// かけて、見下ろし気味の固定カメラからマリオのような横視点
+				// カメラへ滑らかに補間する(下のRunLoop参照)。
+				cameraTransitionElapsed := 0.0
 
 				// 馬の歌が演奏されたら、Linkと同じ場所に馬を呼び出し、以後
 				// Linkが馬に乗って移動しているように見せる。すでに呼んで
@@ -102,6 +109,30 @@ func main() {
 						}
 						scene.Objects[link.Index].Transform = linkTransform
 					}
+
+					// 馬に乗った後は、カメラをマリオのような横視点へ
+					// 滑らかに切り替える。乗る前の固定カメラ(eye/target)から、
+					// プレイヤーのZ座標に追従する横視点カメラ(eye/target)へ、
+					// GrasslandCameraTransitionDuration秒かけて線形補間する。
+					// 遷移が終わった後(t=1)も、この式は毎フレームsideのeye/
+					// targetを現在のplayer.Player.Zから求め直すため、その
+					// まま横視点でプレイヤーを追い続ける。
+					if horseIndex >= 0 {
+						cameraTransitionElapsed += dt
+						t := cameraTransitionElapsed / renderer.GrasslandCameraTransitionDuration
+						if t > 1 {
+							t = 1
+						}
+						t = t * t * (3 - 2*t) // smoothstep: 始点・終点で速度0になる滑らかな遷移
+
+						defaultEye, defaultTarget := renderer.GrasslandDefaultCameraEyeTarget()
+						sideEye, sideTarget := renderer.GrasslandSideCameraEyeTarget(player.Player.Z)
+						eye := defaultEye.Lerp(sideEye, t)
+						target := defaultTarget.Lerp(sideTarget, t)
+						view := vecmath.LookAt(eye, target, renderer.GrasslandCameraUp())
+						scene.ViewProjection = projection.Mul(view)
+					}
+
 					scene.Render(ctx)
 
 					// Linkが右奥の木のあたりまで進んだら、次のフィールド
