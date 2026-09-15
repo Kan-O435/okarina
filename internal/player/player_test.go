@@ -90,3 +90,29 @@ func TestUpdate_FacesMovementDirection(t *testing.T) {
 		t.Fatalf("expected Yaw to stay at 0 while Idle, got %v", s.Yaw)
 	}
 }
+
+func TestUpdate_SpeedMultiplier(t *testing.T) {
+	base := &State{}
+	base.SetDirection(Forward)
+	baseDeltaZ := base.Update(1.0)
+
+	boosted := &State{SpeedMultiplier: 2.0}
+	boosted.SetDirection(Forward)
+	boostedDeltaZ := boosted.Update(1.0)
+
+	if boostedDeltaZ != baseDeltaZ*2 {
+		t.Fatalf("expected boosted deltaZ to be 2x base (base=%v, boosted=%v)", baseDeltaZ, boostedDeltaZ)
+	}
+}
+
+func TestUpdate_ZeroSpeedMultiplierActsAsOne(t *testing.T) {
+	zeroValue := &State{}
+	explicitOne := &State{SpeedMultiplier: 1.0}
+
+	zeroValue.SetDirection(Forward)
+	explicitOne.SetDirection(Forward)
+
+	if got, want := zeroValue.Update(1.0), explicitOne.Update(1.0); got != want {
+		t.Fatalf("expected zero-value SpeedMultiplier to behave like 1.0 (got=%v, want=%v)", got, want)
+	}
+}

@@ -46,6 +46,11 @@ type State struct {
 	Direction Direction
 	Yaw       float64 // Y軸周りの向き(ラジアン)。進行方向に合わせて変わる。
 
+	// SpeedMultiplier は、moveSpeedに掛け合わせる倍率。デフォルトは1.0
+	// (等速)で、馬に乗っている間だけ大きくする、といった用途に使う
+	// (0の場合も1.0として扱う。ゼロ値のStateをそのまま使えるようにするため)。
+	SpeedMultiplier float64
+
 	lastSemitone float64
 	hasPitch     bool
 }
@@ -96,18 +101,28 @@ func (s *State) OnPitch(freq float64) {
 	s.lastSemitone = semitone
 }
 
+// effectiveSpeed はmoveSpeedにSpeedMultiplierを適用した実際の移動速度を
+// 返す。SpeedMultiplierが未設定(ゼロ値)の場合は1.0(等速)として扱う。
+func (s *State) effectiveSpeed() float64 {
+	if s.SpeedMultiplier == 0 {
+		return moveSpeed
+	}
+	return moveSpeed * s.SpeedMultiplier
+}
+
 // Update は経過時間dt(秒)に応じてプレイヤーの位置・向きを進め、この
 // フレームで移動したZ方向の量(ワールド単位)を返す。Idle中は位置も
 // 向きも変えず、直前に移動していた方向を向いたままにする。
 func (s *State) Update(dt float64) float64 {
 	var deltaZ float64
+	speed := s.effectiveSpeed()
 	switch s.Direction {
 	case Forward:
 		s.Yaw = math.Pi
-		deltaZ = -moveSpeed * dt
+		deltaZ = -speed * dt
 	case Backward:
 		s.Yaw = 0
-		deltaZ = moveSpeed * dt
+		deltaZ = speed * dt
 	default:
 		return 0
 	}

@@ -11,6 +11,10 @@ import (
 	"github.com/Kan-O435/okarina/internal/vecmath"
 )
 
+// horseSpeedMultiplier は、馬に乗っている間のLinkの移動速度倍率
+// (徒歩の何倍で進むか)。
+const horseSpeedMultiplier = 2.0
+
 // 草原フィールド(扉を抜けた先)用のエントリーポイント。神殿フィールド
 // (cmd/game)と同じplayerパッケージ・ブリッジ関数を再利用し、オタマトーンの
 // ピッチ入力/矢印キーによるLinkの移動・向き変更をそのまま使えるようにする。
@@ -56,6 +60,7 @@ func main() {
 					horse.Transform = player.Player.Transform(horseLocalTransform)
 					scene.Objects = append(scene.Objects, horse)
 					horseIndex = len(scene.Objects) - 1
+					player.Player.SpeedMultiplier = horseSpeedMultiplier
 				})
 
 				mountOffset := vecmath.Translate(vecmath.NewVec3(0, renderer.LinkMountHeight, 0))
