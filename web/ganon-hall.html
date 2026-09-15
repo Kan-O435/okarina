@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Okarina - ガノンフィールド</title>
+<title>Okarina - ガノンフィールド(玉座の間)</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,8 +11,9 @@
 <canvas id="game-canvas" width="800" height="600"></canvas>
 
 <p style="font-size: 13px; color: #aaa;">
-  ガノンフィールドはまだ背景と地面のみの最小構成です。中身は今後追加していきます。<br>
-  <a href="grassland.html" style="color: #7CFC9A;">草原フィールドに戻る</a>
+  ガノンフィールド(玉座の間案)。<br>
+  <a href="grassland.html" style="color: #7CFC9A;">草原フィールドに戻る</a> /
+  <a href="ganon-battle.html" style="color: #7CFC9A;">戦場跡案を見る</a>
 </p>
 
 <h3>オタマトーンでLinkを移動</h3>
@@ -31,18 +32,11 @@
 <h3>デバッグ操作</h3>
 <div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
 
-<h3>背景デザイン比較</h3>
-<div id="ganon-variant-controls">
-  <button id="btn-variant-battle" class="variant-active">戦場跡(現行案)</button>
-  <button id="btn-variant-hall">玉座の間(旧案)</button>
-</div>
-<div id="ganon-variant-status">現行案: 荒れ果てた戦場跡のジオラマを表示中</div>
-
 <script src="wasm_exec.js"></script>
 <script src="pitch.js"></script>
 <script src="mic-pitch.js"></script>
 <script src="debug-keys.js"></script>
-<script src="ganon.js"></script>
+<script src="ganon-hall.js"></script>
 
 </body>
 </html>

@@ -105,10 +105,10 @@ func main() {
 					scene.Render(ctx)
 
 					// Linkが右奥の木のあたりまで進んだら、次のフィールド
-					// (ガノン)へページ遷移する。
+					// (ガノン・玉座の間)へページ遷移する。
 					if !transitioned && player.Player.Z <= renderer.GrasslandTreeTriggerZ {
 						transitioned = true
-						ctx.Navigate("ganon.html")
+						ctx.Navigate("ganon-hall.html")
 					}
 				})
 				fmt.Println("renderer: grassland scene rendered, game loop started")

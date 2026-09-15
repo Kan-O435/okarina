@@ -118,30 +118,9 @@ func SetInstance(g *Game) {
 	instance = g
 }
 
-// ganonSwitcher は、ガノンフィールドの背景デザイン案(戦場跡/玉座の間)を
-// 切り替えるための関数。cmd/ganon/main.goが起動時に登録する
-// (gameパッケージはrenderer.GanonBackgroundVariant等を知る必要がないよう、
-// 文字列を受け取るだけのコールバックとして持つ)。
-var ganonSwitcher func(variant string)
-
-// SetGanonSwitcher は、ガノンフィールドの背景切り替えを行う関数を登録する。
-func SetGanonSwitcher(f func(variant string)) {
-	ganonSwitcher = f
-}
-
-// SwitchGanonBackground はブリッジ(JavaScript側)から呼ばれ、登録済みの
-// 切り替え関数を実行する。未登録の場合(ガノンフィールド以外のページ)は
-// 何もしない。
-func SwitchGanonBackground(variant string) {
-	if ganonSwitcher != nil {
-		ganonSwitcher(variant)
-	}
-}
-
 // horseSummoner は、草原フィールドで馬を呼び出す(Sceneに馬Objectを追加する)
-// ための関数。cmd/grassland/main.goが起動時に登録する(ganonSwitcherと
-// 同様、gameパッケージがrenderer側の詳細を知る必要がないようコールバックに
-// している)。
+// ための関数。cmd/grassland/main.goが起動時に登録する(gameパッケージが
+// renderer側の詳細を知る必要がないようコールバックにしている)。
 var horseSummoner func()
 
 // SetHorseSummoner は、草原フィールドで馬を呼び出す関数を登録する。
