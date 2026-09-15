@@ -24,9 +24,10 @@ const grasslandPathHalfWidth = 1.8
 const grasslandLinkZ = 3.5
 
 // GrasslandTreeTriggerZ は、Linkが右奥の木(grasslandTreeObjectsの
-// X:16, Z:-25の木)のあたりまで進んだら、次のフィールド(ガノン)へ
-// ページ遷移するトリガーとして使うZ座標。
-const GrasslandTreeTriggerZ = -25.0
+// X:16の木)のあたりまで進んだら、次のフィールド(ガノン)へページ遷移
+// するトリガーとして使うZ座標。最後の柵(grasslandObstacleZs末尾)を
+// 越えた後、少し走ってから次のフィールドへ着くよう余裕を持たせている。
+const GrasslandTreeTriggerZ = -67.0
 
 // grasslandCastleZ/Height は、道の先端(遠景、far=150に収まる範囲でできる
 // だけ奥)に置く白い城(internal/assets.GrasslandCastle)の位置・高さ。
@@ -34,7 +35,7 @@ const GrasslandTreeTriggerZ = -25.0
 // うち、画面上端まで約6°分の余白が残る)。この余白に手段A(放射状
 // グラデーションのハロー)を後から重ねられる。
 const (
-	grasslandCastleZ      = -58.0
+	grasslandCastleZ      = -85.0
 	grasslandCastleHeight = 21.0
 )
 
@@ -48,23 +49,22 @@ const (
 	grasslandHaloHalfHeight = 12.0
 )
 
-// grasslandObstacle* は、道の途中に置く柵(丸太)の位置・大きさ。馬に乗って
-// ジャンプしないと越えられない障害物として使う
-// (GrasslandObstacleNearZ/FarZ、GrasslandObstacleBlocks参照)。
+// grasslandObstacleHalfDepth/HalfWidth/Height は、道の途中に置く柵(丸太)の
+// 大きさ。馬に乗ってジャンプしないと越えられない障害物として使う
+// (grasslandObstacleZs、GrasslandObstacleBlocks参照)。
 const (
-	grasslandObstacleZ         = -12.0
 	grasslandObstacleHalfDepth = 0.4
 	grasslandObstacleHalfWidth = 2.4 // 道(半幅1.8)より広く取り、道を完全にふさぐ
 	grasslandObstacleHeight    = 1.0
 )
 
-// GrasslandObstacleNearZ/GrasslandObstacleFarZ は、障害物のZ方向の手前端
-// (スポーン地点側)・奥端(城側)。GrasslandObstacleBlocksが、Linkがこの
-// 範囲を横切ったかどうかの判定に使う。
-const (
-	GrasslandObstacleNearZ = grasslandObstacleZ + grasslandObstacleHalfDepth
-	GrasslandObstacleFarZ  = grasslandObstacleZ - grasslandObstacleHalfDepth
-)
+// grasslandObstacleZs は、道に沿って並べる柵の中心Z座標。プレイヤーは
+// スポーン地点(grasslandLinkZ)から城に向かってZが減る方向へ進むため、
+// 手前から奥の順に並んでいる。馬に乗って加速しながら連続してジャンプする
+// アスレチックのような区間にするため、単発の障害物ではなく複数個を
+// 間隔を空けて配置している(1つ目は徒歩でも見える距離に置き、馬の歌を
+// 演奏する必然性を作る)。
+var grasslandObstacleZs = []float64{-12.0, -27.0, -42.0, -57.0}
 
 // grasslandObstacleClampMargin は、GrasslandObstacleBlocksが移動を止める際、
 // 境界からほんの少しだけ外側(通行可能な側)に押し戻す量。ちょうど境界の
@@ -159,7 +159,7 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projecti
 	}
 	objects = append(objects, trees...)
 
-	objects = append(objects, grasslandObstacleObject(c))
+	objects = append(objects, grasslandObstacleObjects(c)...)
 
 	linkObj, linkLocal, err := grasslandLinkObject(c)
 	if err != nil {
@@ -281,20 +281,36 @@ func grasslandSkyObjects(c *Context) ([]Object, error) {
 // grasslandObstacleColor は、道をふさぐ丸太っぽい茶色。
 var grasslandObstacleColor = vecmath.NewVec3(0.45, 0.32, 0.18)
 
-// grasslandObstacleObject は、道の途中(grasslandObstacleZ)に置く、馬に
-// 乗ってジャンプしないと越えられない柵(直方体のプレースホルダー)を
-// 組み立てる。
-func grasslandObstacleObject(c *Context) Object {
-	verts := boxVertices(grasslandObstacleHalfWidth, grasslandObstacleHeight, grasslandObstacleHalfDepth)
-	mesh := c.NewMesh(verts, zeroUVs(8), boxIndices())
-	transform := vecmath.Translate(vecmath.NewVec3(0, 0, grasslandObstacleZ))
-	return Object{Mesh: mesh, Transform: transform, Color: grasslandObstacleColor}
+// GrasslandObstacleBoundsAt は、grasslandObstacleZs[index]の柵のZ方向の
+// 手前端(near、スポーン地点側)・奥端(far、城側)を返す。GrasslandObstacle
+// Blocksの判定・テストで使う。
+func GrasslandObstacleBoundsAt(index int) (near, far float64) {
+	z := grasslandObstacleZs[index]
+	return z + grasslandObstacleHalfDepth, z - grasslandObstacleHalfDepth
+}
+
+// GrasslandObstacleCount は、道に配置した柵の数を返す。
+func GrasslandObstacleCount() int {
+	return len(grasslandObstacleZs)
+}
+
+// grasslandObstacleObjects は、grasslandObstacleZsの各位置に、馬に乗って
+// ジャンプしないと越えられない柵(直方体のプレースホルダー)を組み立てる。
+func grasslandObstacleObjects(c *Context) []Object {
+	objects := make([]Object, 0, len(grasslandObstacleZs))
+	for _, z := range grasslandObstacleZs {
+		verts := boxVertices(grasslandObstacleHalfWidth, grasslandObstacleHeight, grasslandObstacleHalfDepth)
+		mesh := c.NewMesh(verts, zeroUVs(8), boxIndices())
+		transform := vecmath.Translate(vecmath.NewVec3(0, 0, z))
+		objects = append(objects, Object{Mesh: mesh, Transform: transform, Color: grasslandObstacleColor})
+	}
+	return objects
 }
 
 // GrasslandObstacleBlocks は、Linkが1フレームでprevZからnewZへ移動した際に、
-// 障害物(GrasslandObstacleFarZ〜GrasslandObstacleNearZの範囲)を横切った
-// かどうかを判定する。jumpingがtrue(ジャンプ中)の場合は常に通行を許可
-// する。横切っていて、かつジャンプ中でなければ、移動を止めるべき境界の
+// いずれかの柵(grasslandObstacleZs、GrasslandObstacleBoundsAt参照)を
+// 横切ったかどうかを判定する。jumpingがtrue(ジャンプ中)の場合は常に通行を
+// 許可する。横切っていて、かつジャンプ中でなければ、移動を止めるべき境界の
 // 少し外側(grasslandObstacleClampMargin分)のZ座標をblockedZとして返す。
 // 境界ちょうどに止めると、次のフレームでも「まだ範囲内」と判定され続けて
 // 離れる方向にも進めなくなる(スタックする)ため、必ず範囲の外側に出す。
@@ -307,16 +323,20 @@ func GrasslandObstacleBlocks(prevZ, newZ float64, jumping bool) (blockedZ float6
 	if lo > hi {
 		lo, hi = hi, lo
 	}
-	if hi < GrasslandObstacleFarZ || lo > GrasslandObstacleNearZ {
-		return 0, false
-	}
 
-	if newZ < prevZ {
-		// 前進(Zが減る方向)して障害物に入った → 手前の境界の外側で止める。
-		return GrasslandObstacleNearZ + grasslandObstacleClampMargin, true
+	for i := range grasslandObstacleZs {
+		near, far := GrasslandObstacleBoundsAt(i)
+		if hi < far || lo > near {
+			continue
+		}
+		if newZ < prevZ {
+			// 前進(Zが減る方向)して障害物に入った → 手前の境界の外側で止める。
+			return near + grasslandObstacleClampMargin, true
+		}
+		// 後退(Zが増える方向)して障害物に入った → 奥の境界の外側で止める。
+		return far - grasslandObstacleClampMargin, true
 	}
-	// 後退(Zが増える方向)して障害物に入った → 奥の境界の外側で止める。
-	return GrasslandObstacleFarZ - grasslandObstacleClampMargin, true
+	return 0, false
 }
 
 // grasslandTreeHeight は、草原フィールドに置く木の高さ。
@@ -344,8 +364,8 @@ func grasslandTreeObjects(c *Context) ([]Object, error) {
 	}
 
 	placements := []treePlacement{
-		{X: 16, Z: -25, Height: grasslandTreeHeight}, // 道の右奥(画面右上寄り)
-		{X: -5, Z: 2.5, Height: grasslandTreeHeight}, // 道の左手前(画面左下寄り、視錐台に収まる位置)
+		{X: 16, Z: GrasslandTreeTriggerZ, Height: grasslandTreeHeight}, // 道の右奥(次のフィールドへのトリガー地点の目印)
+		{X: -5, Z: 2.5, Height: grasslandTreeHeight},                   // 道の左手前(画面左下寄り、視錐台に収まる位置)
 	}
 
 	objects := make([]Object, 0, len(placements))
