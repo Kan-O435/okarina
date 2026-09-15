@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 
 	"github.com/Kan-O435/okarina/internal/bridge"
@@ -14,6 +15,13 @@ import (
 // horseSpeedMultiplier は、馬に乗っている間のLinkの移動速度倍率
 // (徒歩の何倍で進むか)。
 const horseSpeedMultiplier = 2.0
+
+// grasslandObstacleCenterZ/grasslandSongSheetRangeZ は、「馬の歌」の楽譜
+// HUDを表示するかどうかの判定に使う。障害物(柵)からこの距離以内に
+// プレイヤーが近づいたら表示する(神殿フィールドの扉と楽譜HUDの関係と同様)。
+var grasslandObstacleCenterZ = (renderer.GrasslandObstacleNearZ + renderer.GrasslandObstacleFarZ) / 2
+
+const grasslandSongSheetRangeZ = 4.0
 
 // 草原フィールド(扉を抜けた先)用のエントリーポイント。神殿フィールド
 // (cmd/game)と同じplayerパッケージ・ブリッジ関数を再利用し、オタマトーンの
@@ -75,6 +83,11 @@ func main() {
 
 				mountOffset := vecmath.Translate(vecmath.NewVec3(0, renderer.LinkMountHeight, 0))
 
+				horseSongHUD, err := renderer.BuildHorseSongSheetHUD(ctx, width, height)
+				if err != nil {
+					fmt.Println("renderer: failed to build horse song sheet HUD:", err)
+				}
+
 				ctx.RunLoop(func(dt float64) {
 					prevZ := player.Player.Z
 					deltaZ := player.Player.Update(dt)
@@ -103,6 +116,13 @@ func main() {
 						scene.Objects[link.Index].Transform = linkTransform
 					}
 					scene.Render(ctx)
+
+					// 馬の歌の楽譜は、障害物に近づいた時だけ表示する。
+					// 馬の歌を演奏し終えたら(呼び出し済みになったら)消す。
+					if horseSongHUD != nil && !game.HorseSongPlayed() &&
+						math.Abs(player.Player.Z-grasslandObstacleCenterZ) <= grasslandSongSheetRangeZ {
+						horseSongHUD.Render(ctx, width, height)
+					}
 
 					// Linkが右奥の木のあたりまで進んだら、次のフィールド
 					// (ガノン・玉座の間)へページ遷移する。
