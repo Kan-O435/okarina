@@ -37,6 +37,7 @@
 
 <h3>デバッグ操作</h3>
 <div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
+<button id="btn-summon-horse">馬に乗る(テスト)</button>
 
 <script src="wasm_exec.js"></script>
 <script src="audio.js"></script>
@@ -45,6 +46,14 @@
 <script src="mic-pitch.js"></script>
 <script src="debug-keys.js"></script>
 <script src="grassland.js"></script>
+<script>
+  // 「馬の歌」を演奏しなくても、馬に乗った状態(横視点カメラへの切り替え
+  // 含む)を試せるデバッグ用ボタン(ganon-hall.htmlのbtn-preview-collapse等と
+  // 同様の仮実装パターン)。
+  document.getElementById('btn-summon-horse').addEventListener('click', () => {
+    window.goSummonHorse();
+  });
+</script>
 
 </body>
 </html>

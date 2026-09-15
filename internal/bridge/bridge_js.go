@@ -22,7 +22,8 @@ func Init() {
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
 	js.Global().Set("goPreviewGanonHallCollapse", js.FuncOf(goPreviewGanonHallCollapse))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse)")
+	js.Global().Set("goSummonHorse", js.FuncOf(goSummonHorse))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound)の実装をgameパッケージに
@@ -148,5 +149,14 @@ func goDefeatGanonFirstForm(this js.Value, args []js.Value) interface{} {
 func goPreviewGanonHallCollapse(this js.Value, args []js.Value) interface{} {
 	game.TriggerGanonHallCollapsePreview()
 	CallConsoleLog("bridge: goPreviewGanonHallCollapse() called, previewing hall collapse")
+	return nil
+}
+
+// goSummonHorse はJavaScript側(草原フィールドのデバッグ「馬に乗る」
+// ボタン)から呼び出され、馬の歌を演奏したときと同じ処理(馬を呼び出す)を
+// 演奏なしで直接実行する。
+func goSummonHorse(this js.Value, args []js.Value) interface{} {
+	game.TriggerHorseSummon()
+	CallConsoleLog("bridge: goSummonHorse() called, summoning horse")
 	return nil
 }
