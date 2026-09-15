@@ -199,11 +199,13 @@ func main() {
 					}
 					if smokeElapsed >= ganonHallSmokeDuration {
 						// 煙が出終わったら、そのまま崩落演出(岩+wipe岩)へ移る。
+						// 岩が降り始めるこの瞬間に効果音を鳴らす。
 						phase = ganonHallCollapsing
 						for _, r := range rocks {
 							r.y = ganonHallCollapseRockStartY
 						}
 						wipeRock.y = ganonHallCollapseRockStartY
+						game.PlayGanonHallCollapseSound()
 					}
 
 				case ganonHallCollapsing:

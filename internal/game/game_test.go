@@ -248,6 +248,24 @@ func TestPlayHorseJumpSound_NilHookDoesNothing(t *testing.T) {
 	PlayHorseJumpSound() // パニックしないことを確認する
 }
 
+func TestPlayGanonHallCollapseSound_CallsRegisteredHook(t *testing.T) {
+	calls := 0
+	SetPlayGanonHallCollapseSoundFunc(func() { calls++ })
+	defer SetPlayGanonHallCollapseSoundFunc(nil)
+
+	PlayGanonHallCollapseSound()
+
+	if calls != 1 {
+		t.Fatalf("expected the registered hook to be called once, got %d", calls)
+	}
+}
+
+func TestPlayGanonHallCollapseSound_NilHookDoesNothing(t *testing.T) {
+	SetPlayGanonHallCollapseSoundFunc(nil)
+
+	PlayGanonHallCollapseSound() // パニックしないことを確認する
+}
+
 func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testing.T) {
 	horseSongPlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
