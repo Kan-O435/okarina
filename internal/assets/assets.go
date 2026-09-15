@@ -80,3 +80,11 @@ var GanonBoss []byte
 //
 //go:embed models/horse.glb
 var Horse []byte
+
+// HorseSongSheetTexture は、「馬の歌」(レ→シ→ラ→レ→シ→ラ)の楽譜を
+// 表すバナー画像(背景透過PNG、ChatGPT生成)。草原フィールドで障害物に
+// 近づいた時だけHUDとして表示する(internal/renderer.BuildHorseSongSheetHUD、
+// game.IsNearGrasslandObstacle参照)。
+//
+//go:embed textures/horse-song-sheet.png
+var HorseSongSheetTexture []byte
