@@ -162,6 +162,12 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, link LinkPlacement, doorInde
 	}
 	objects = append(objects, trees...)
 
+	clouds, err := templeCloudObjects(c)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+	objects = append(objects, clouds...)
+
 	// 扉は背景が透過のテクスチャを使うため、後ろにある建物本体などの不透明な
 	// オブジェクトがすでに描画された後(=Objectsの最後)に描画する。先に描くと、
 	// 扉の透過部分が「まだ何も描かれていない背景色」と合成され、後から描かれる
@@ -303,8 +309,8 @@ type treePlacement struct {
 // 2種類だけに絞って配置する。それ以外の(参道沿い・神殿側面などの)木は
 // 意図的に置かない。見た目の再現性のため乱数シードは固定する。
 const (
-	treeMinHeight = 4.5
-	treeMaxExtra  = 3.0
+	treeMinHeight = 7.0
+	treeMaxExtra  = 4.0
 	// buildingHalfDepthMeasured は、建物本体GLB(高さbuildingTargetHeightへ
 	// スケール後)の奥行き方向の半分の実測値(bounding boxから算出、
 	// doorCenterZのコメント参照)。裏側の並木をこの分だけ建物中心から
@@ -355,37 +361,84 @@ func treePlacements() []treePlacement {
 	return placements
 }
 
-// treeObjects は、CC0の低ポリ木モデル群(internal/assets.Trees、Gobkit Nature
-// Kit)を読み込み、treePlacements()の配置に従って並べる。木の種類は同じ
-// メッシュ・テクスチャを使い回し、Transformだけを変えて複製する
-// (頂点データを毎回コピーしない)。
+// treeObjects は、神殿フィールド専用の木モデル(internal/assets.TempleTree、
+// Sketchfabのファンアートではなく通常のCC BY素材)を読み込み、
+// treePlacements()の配置に従って並べる。同じメッシュ・テクスチャを
+// 使い回し、Transformだけを変えて複製する(頂点データを毎回コピーしない)。
+// Sketchfabの「converted」形式で、ルートノードにZ-up→Y-up補正等の変換
+// 行列が入っているため、これを無視するLoadGLBMesh(gltf.Parse)ではなく、
+// ノードのワールド変換行列を焼き込むgltf.ParseParts経由で読み込む
+// (GanonBoss等と同じパターン。メッシュは1つだけなのでparts[0]を使う)。
 func treeObjects(c *Context) ([]Object, error) {
-	entries, err := assets.Trees.ReadDir("models/trees")
+	prims, err := gltf.ParseParts(assets.TempleTree)
+	if err != nil {
+		return nil, err
+	}
+	if len(prims) == 0 {
+		return nil, nil
+	}
+	model, err := c.buildModel(&prims[0])
 	if err != nil {
 		return nil, err
 	}
 
-	models := make([]*Model, 0, len(entries))
-	for _, entry := range entries {
-		data, err := assets.Trees.ReadFile("models/trees/" + entry.Name())
-		if err != nil {
-			return nil, err
-		}
-		model, err := c.LoadGLBMesh(data)
-		if err != nil {
-			return nil, err
-		}
-		models = append(models, model)
-	}
-	if len(models) == 0 {
-		return nil, nil
-	}
-
 	placements := treePlacements()
 	objects := make([]Object, 0, len(placements))
-	for i, p := range placements {
-		model := models[i%len(models)]
+	for _, p := range placements {
 		transform := model.GroundTransform(p.X, p.Z, p.Height)
+		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color})
+	}
+	return objects, nil
+}
+
+// templeCloudPlacement は、神殿の上空に浮かべる雲1個ぶんの配置。PartIndex
+// はinternal/assets.TempleCloud(16種類の雲メッシュ)のうちどれを使うかを
+// 指定する(gltf.ParseParts()が返す順序、見た目を確認しながら手で選んだ
+// もの)。X/Y/Zはワールド座標、Heightは目標の高さ。
+type templeCloudPlacement struct {
+	PartIndex       int
+	X, Y, Z, Height float64
+}
+
+// templeCloudPlacements は、神殿フィールドの空に浮かべる雲の配置一覧。
+// 建物(buildingCenterZ=-21、高さbuildingTargetHeight=10)の上空・奥に
+// 散らばるよう、高さ(Y)は建物の屋根より上、奥行き(Z)は手前〜奥まで
+// 散らして配置している。
+var templeCloudPlacements = []templeCloudPlacement{
+	{PartIndex: 0, X: -18, Y: 11, Z: -35, Height: 1.8},
+	{PartIndex: 3, X: 16, Y: 12.5, Z: -50, Height: 2.2},
+	{PartIndex: 5, X: -9, Y: 13.5, Z: -65, Height: 2.0},
+	{PartIndex: 8, X: 22, Y: 10.5, Z: -25, Height: 1.5},
+	{PartIndex: 11, X: 4, Y: 14.5, Z: -80, Height: 2.6},
+	{PartIndex: 14, X: -25, Y: 12, Z: -55, Height: 1.8},
+	// 画面左上が空いていたため追加(カメラに近め・高めにして左上に映るように)。
+	{PartIndex: 2, X: -38, Y: 19, Z: -30, Height: 2.2},
+	{PartIndex: 6, X: -30, Y: 22, Z: -48, Height: 2.6},
+}
+
+// templeCloudObjects は、internal/assets.TempleCloud(16種類の雲メッシュを
+// まとめたGLB)から、templeCloudPlacementsで指定した雲だけを選んで
+// 神殿フィールドの上空に配置する。スキンは無くパーツごとに別メッシュへ
+// 分かれているため、GanonBoss等と同様にgltf.ParseParts+buildModelで
+// 読み込む(GroundTransformで各雲を独立にスケール・配置するため
+// CombinedGroundTransformは使わない)。
+func templeCloudObjects(c *Context) ([]Object, error) {
+	prims, err := gltf.ParseParts(assets.TempleCloud)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]Object, 0, len(templeCloudPlacements))
+	for _, p := range templeCloudPlacements {
+		if p.PartIndex < 0 || p.PartIndex >= len(prims) {
+			continue
+		}
+		model, err := c.buildModel(&prims[p.PartIndex])
+		if err != nil {
+			return nil, err
+		}
+		localTransform := model.GroundTransform(0, 0, p.Height)
+		transform := vecmath.Translate(vecmath.NewVec3(p.X, p.Y, p.Z)).Mul(localTransform)
 		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color})
 	}
 	return objects, nil

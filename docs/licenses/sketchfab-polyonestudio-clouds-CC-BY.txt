@@ -1,0 +1,23 @@
+Stylized Clouds Pack - Vol 09
+
+Author: PolyOne Studio (https://sketchfab.com/polyone)
+Source: https://sketchfab.com/3d-models/stylized-clouds-pack-vol-09-d9c1ff67f80841c6b1d8229dca5495a5
+
+License: Creative Commons Attribution (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution:
+"Stylized Clouds Pack - Vol 09" by PolyOne Studio is licensed under
+Creative Commons Attribution.
+
+---
+
+Used as internal/assets/models/temple-cloud.glb (internal/assets.TempleCloud),
+floating clouds added to the temple field's sky (cmd/game /
+internal/renderer/demo.go's templeCloudObjects). Grassland's own clouds
+(internal/assets.CloudTexture, a flat billboard) are unaffected.
+
+16 solid block-style cloud meshes in one GLB (no skin, no embedded texture —
+color comes from a flat material baseColorFactor), loaded with
+gltf.ParseParts like the Ganon boss assets; only a handful of the 16 are
+used, picked and placed by hand above/around the temple building.
