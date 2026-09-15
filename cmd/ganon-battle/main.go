@@ -103,17 +103,20 @@ func main() {
 		width, height := ctx.CanvasSize()
 		ctx.Viewport(width, height)
 		ctx.EnableDepthTest()
-		ctx.EnableBlend()                     // 嵐雲・煙・白フェードの半透明合成のため
+		ctx.EnableBlend()                     // 楽譜HUD・嵐雲・煙・白フェードの半透明合成のため
 		ctx.ClearColor(0.15, 0.05, 0.05, 1.0) // 暗く不穏な赤黒い空気
 
 		scene, link, err := renderer.BuildGanonScene(ctx, renderer.GanonBackgroundBattle)
 		rockParts, rockPartsErr := renderer.LoadRockDebrisParts(ctx)
+		melodySheetHUD, melodySheetErr := renderer.BuildGanonBattleMelodySheetHUD(ctx, width, height)
 		smokeTemplate, smokeErr := renderer.GanonHallSmokeObject(ctx)
 		whiteFade, whiteFadeErr := renderer.BuildWhiteFadeOverlay(ctx, width, height)
 		if err != nil {
 			fmt.Println("renderer: failed to build ganon scene:", err)
 		} else if rockPartsErr != nil {
 			fmt.Println("renderer: failed to load rock debris parts:", rockPartsErr)
+		} else if melodySheetErr != nil {
+			fmt.Println("renderer: failed to build ganon battle melody sheet HUD:", melodySheetErr)
 		} else if smokeErr != nil {
 			fmt.Println("renderer: failed to load smoke effect:", smokeErr)
 		} else if whiteFadeErr != nil {
@@ -316,6 +319,12 @@ func main() {
 				}
 
 				scene.Render(ctx)
+
+				// 嵐の歌の楽譜は、撃破演出が始まる前(まだ正しく演奏できて
+				// いない間)だけ表示する。
+				if !game.GanonBattleMelodyPlayed() {
+					melodySheetHUD.Render(ctx, width, height)
+				}
 
 				if overlayAlpha > 0 {
 					whiteFade.Render(ctx, width, height, overlayAlpha)
