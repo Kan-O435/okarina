@@ -129,35 +129,20 @@ func SetHorseSummoner(f func()) {
 }
 
 // jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
-// 低い音を2回連続で出すジェスチャーでジャンプを発生させる
-// (馬に乗っている間に障害物を飛び越える、といった用途に使う)。
+// 低い音を1回鳴らすだけでジャンプを発生させる(馬に乗っている間に
+// 障害物を飛び越える、といった用途に使う)。以前は「低い音を2回」の
+// ジェスチャーだったが、オタマトーンは指をスライドさせて音程を変える
+// ため2回連続で低い音を出す操作が難しく、ジャンプがほぼ成立しない
+// 原因になっていたため、1回の立ち上がりで即座に発火するよう簡略化した。
 const jumpPitchThresholdHz = 180.0
 
-// jumpHighResetStreak は、ジェスチャーのカウントをリセットする「明確に
-// 高い音」とみなすために必要な連続フレーム数。マイクのピッチ検出は
-// ノイズやオクターブ誤検出、音を切り替える際の滑らかなピッチの動き
-// (オタマトーンは鍵盤がなく指をスライドさせて音程を変えるため、低い音
-// から次の低い音へ移る間に一瞬だけ高い周波数を誤検出しやすい)により、
-// 単発で閾値を超える読み取りが混ざりやすい。1フレームだけの高い読み取り
-// で即座にリセットしてしまうと、実際にはジェスチャーが成立しているのに
-// カウントが台無しになり「ジャンプしにくい」原因になるため、複数フレーム
-// 連続で高い音が検出された場合のみリセットする。
-const jumpHighResetStreak = 3
+// jumpGestureLow は、直前の読み取りが低い音の最中だったかどうかを保持
+// する。無音や高い音を挟まずに同じ低い音を鳴らし続けている間は
+// 再度発火しない(立ち上がりのみで判定する)ようにするために使う。
+var jumpGestureLow bool
 
-// jumpGestureLow・jumpGestureCount・jumpHighStreak は、「低い音を2回」
-// ジェスチャーの検出状態。jumpGestureLowは直前の読み取りが低い音の最中
-// だったかどうか(無音や高い音を挟まずに同じ低い音を鳴らし続けている間は
-// 2回とカウントしない)、jumpGestureCountは低い音の立ち上がりを検出した
-// 回数、jumpHighStreakは高い音が連続で検出されているフレーム数
-// (jumpHighResetStreak参照)。
-var (
-	jumpGestureLow   bool
-	jumpGestureCount int
-	jumpHighStreak   int
-)
-
-// jumpTrigger は、「低い音を2回」のジェスチャーが成立した際に呼ばれる
-// 関数。cmd/grassland/main.goが起動時に登録する(horseSummonerと同様の
+// jumpTrigger は、低い音の立ち上がりを検出した際に呼ばれる関数。
+// cmd/grassland/main.goが起動時に登録する(horseSummonerと同様の
 // コールバックパターン)。馬に乗っていない場合は登録側で無視する想定。
 var jumpTrigger func()
 
@@ -167,34 +152,13 @@ func SetJumpTrigger(f func()) {
 	jumpTrigger = f
 }
 
-// updateJumpGesture は、最新のピッチ(Hz)から「低い音を2回」ジェスチャーの
-// 検出状態を進める。低い音の立ち上がり(無音・高い音から低い音に変わった
-// 瞬間)を1回とカウントし、2回連続で検出したらjumpTriggerを呼ぶ。
-// 明確に高い音(低い音ではない、かつ無音でもない)が連続
-// jumpHighResetStreak回検出されたら、それまでのカウントはリセットする
-// (ジェスチャーの途中で別の演奏に移ったとみなす)。単発の高い読み取りでは
-// リセットしない(jumpHighResetStreak参照)。
+// updateJumpGesture は、最新のピッチ(Hz)から低い音の立ち上がり(無音・
+// 高い音から低い音に変わった瞬間)を検出し、検出したら即座にjumpTrigger
+// を呼ぶ。同じ低い音を鳴らし続けている間は再度発火しない。
 func updateJumpGesture(freq float64) {
 	isLow := freq > 0 && freq < jumpPitchThresholdHz
-	isHigh := freq >= jumpPitchThresholdHz
-
-	if isHigh {
-		jumpHighStreak++
-	} else {
-		jumpHighStreak = 0
-	}
-
-	switch {
-	case isLow && !jumpGestureLow:
-		jumpGestureCount++
-		if jumpGestureCount >= 2 {
-			jumpGestureCount = 0
-			if jumpTrigger != nil {
-				jumpTrigger()
-			}
-		}
-	case jumpHighStreak >= jumpHighResetStreak:
-		jumpGestureCount = 0
+	if isLow && !jumpGestureLow && jumpTrigger != nil {
+		jumpTrigger()
 	}
 	jumpGestureLow = isLow
 }
