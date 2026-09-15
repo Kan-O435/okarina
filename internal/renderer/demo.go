@@ -28,6 +28,11 @@ const (
 	poolCenterZ   = -10.0
 	poolOffsetX   = 5.0 // 道を挟んで左右に配置
 
+	// groundEdgeBorderWidth は、道・プールの縁に付ける茶色い縁取りの幅
+	// (本体の半径にこの分だけ足した大きさの板を、本体より低いY・先に描く
+	// ことで縁だけがはみ出して見えるようにする)。
+	groundEdgeBorderWidth = 0.4
+
 	linkSpawnZ       = poolCenterZ + poolHalfDepth // Linkの足元をプール手前端(カメラ側の辺)に揃える
 	linkTargetHeight = 1.4                         // Linkモデル(internal/assets.LinkKnight)をこの高さになるようスケールする
 
@@ -138,12 +143,10 @@ func BuildFieldDemoScene(c *Context) (scene *Scene, link LinkPlacement, doorInde
 		vecmath.NewVec3(0, 1, 0),
 	)
 
-	objects := []Object{
-		groundObject(c),
-		pathObject(c),
-		poolObject(c, -poolOffsetX),
-		poolObject(c, poolOffsetX),
-	}
+	objects := []Object{groundObject(c)}
+	objects = append(objects, pathObjects(c)...)
+	objects = append(objects, poolObjects(c, -poolOffsetX)...)
+	objects = append(objects, poolObjects(c, poolOffsetX)...)
 	templeBody, err := templeBodyObject(c)
 	if err != nil {
 		return nil, LinkPlacement{}, -1, err
@@ -192,20 +195,72 @@ func groundObject(c *Context) Object {
 	return Object{Mesh: mesh, Transform: vecmath.Identity(), Color: vecmath.NewVec3(0.35, 0.55, 0.25)}
 }
 
-func pathObject(c *Context) Object {
+// groundEdgeColor は、道・プールの縁取りに使う茶色(土・石畳の縁をイメージ)。
+var groundEdgeColor = vecmath.NewVec3(0.4, 0.3, 0.18)
+
+// poolWaterColor/poolWaveColor は、プールを池らしく見せるための水面の色。
+// ベースの水色(poolWaterColor)の上に、青色の細い波線(poolWaveColor、
+// waveRibbonVertices)を何本か重ねるだけの簡易的な表現。
+var (
+	poolWaterColor = vecmath.NewVec3(0.5, 0.75, 0.82)
+	poolWaveColor  = vecmath.NewVec3(0.15, 0.42, 0.62)
+)
+
+// poolWave*は、水面に重ねる波線の形(waveRibbonVertices参照)。
+const (
+	poolWaveHalfWidth   = poolHalfWidth * 0.85
+	poolWaveAmplitude   = 0.25
+	poolWaveWavelength  = 1.3
+	poolWaveHalfThick   = 0.06
+	poolWaveSegments    = 12
+	poolWaveLineCount   = 4
+	poolWaveLineSpacing = poolHalfDepth * 1.7 / (poolWaveLineCount - 1)
+)
+
+// pathObjects は、道の板に加えて、道より一回り大きい茶色の板を下に敷いて
+// 縁取りを作る(groundEdgeBorderWidth分だけ道からはみ出させる)。
+func pathObjects(c *Context) []Object {
 	halfDepth := float32((pathNearZ - pathFarZ) / 2)
 	centerZ := float32((pathNearZ + pathFarZ) / 2)
+	transform := vecmath.Translate(vecmath.NewVec3(0, 0, float64(centerZ)))
+
+	borderVerts := quadVertices(pathHalfWidth+groundEdgeBorderWidth, halfDepth+groundEdgeBorderWidth, 0.005)
+	borderMesh := c.NewMesh(borderVerts, zeroUVs(4), quadIndices())
+	border := Object{Mesh: borderMesh, Transform: transform, Color: groundEdgeColor}
+
 	verts := quadVertices(pathHalfWidth, halfDepth, 0.01)
 	mesh := c.NewMesh(verts, zeroUVs(4), quadIndices())
-	transform := vecmath.Translate(vecmath.NewVec3(0, 0, float64(centerZ)))
-	return Object{Mesh: mesh, Transform: transform, Color: vecmath.NewVec3(0.6, 0.55, 0.45)}
+	path := Object{Mesh: mesh, Transform: transform, Color: vecmath.NewVec3(0.6, 0.55, 0.45)}
+
+	return []Object{border, path}
 }
 
-func poolObject(c *Context, offsetX float32) Object {
-	verts := quadVertices(poolHalfWidth, poolHalfDepth, 0.01)
-	mesh := c.NewMesh(verts, zeroUVs(4), quadIndices())
+// poolObjects は、プールの縁取り(茶色、groundEdgeBorderWidth分だけ大きい板)、
+// 水面(poolWaterColor)、水面に重ねる青色の波線(poolWaveColor、
+// poolWaveLineCount本)を重ねて、池らしい見た目にする。
+func poolObjects(c *Context, offsetX float32) []Object {
 	transform := vecmath.Translate(vecmath.NewVec3(float64(offsetX), 0, poolCenterZ))
-	return Object{Mesh: mesh, Transform: transform, Color: vecmath.NewVec3(0.25, 0.45, 0.65)}
+
+	borderVerts := quadVertices(poolHalfWidth+groundEdgeBorderWidth, poolHalfDepth+groundEdgeBorderWidth, 0.005)
+	borderMesh := c.NewMesh(borderVerts, zeroUVs(4), quadIndices())
+	border := Object{Mesh: borderMesh, Transform: transform, Color: groundEdgeColor}
+
+	waterVerts := quadVertices(poolHalfWidth, poolHalfDepth, 0.01)
+	waterMesh := c.NewMesh(waterVerts, zeroUVs(4), quadIndices())
+	water := Object{Mesh: waterMesh, Transform: transform, Color: poolWaterColor}
+
+	objects := []Object{border, water}
+
+	waveVerts := waveRibbonVertices(poolWaveHalfWidth, poolWaveAmplitude, poolWaveWavelength, poolWaveHalfThick, 0.015, poolWaveSegments)
+	waveIndices := waveRibbonIndices(poolWaveSegments)
+	waveMesh := c.NewMesh(waveVerts, zeroUVs(len(waveVerts)/3), waveIndices)
+	for i := 0; i < poolWaveLineCount; i++ {
+		z := -poolHalfDepth*0.85 + float64(i)*poolWaveLineSpacing
+		waveTransform := transform.Mul(vecmath.Translate(vecmath.NewVec3(0, 0, z)))
+		objects = append(objects, Object{Mesh: waveMesh, Transform: waveTransform, Color: poolWaveColor})
+	}
+
+	return objects
 }
 
 // templeBodyObject は、Tripo3Dで生成・リメッシュ済みの建物本体+双尖塔GLB

@@ -1,5 +1,7 @@
 package renderer
 
+import "math"
+
 // このファイルは、手打ちで用意する基本形状(平面・直方体)の頂点データを生成する。
 // 地面・道・プールのような「ほぼ平ら」なものはquad、階段・塔・建物プレース
 // ホルダーのような「厚みのある」ものはboxを使う。
@@ -94,4 +96,35 @@ func boxVertices(halfWidth, height, halfDepth float32) []float32 {
 		x, y, z, // v6
 		-x, y, z, // v7
 	}
+}
+
+// waveRibbonVertices は、X軸に沿ってZ方向へゆるく蛇行する、薄いリボン状の板の
+// 頂点を返す(池の水面に波を1本描くのに使う)。中心線がsinカーブを描き、
+// その両側にhalfThicknessぶんの幅を持たせた帯として組み立てる。
+// segments個の区間(頂点はsegments+1組×2)に分割し、waveRibbonIndicesと
+// あわせて使う。
+func waveRibbonVertices(halfWidth, amplitude, wavelength, halfThickness, y float32, segments int) []float32 {
+	verts := make([]float32, 0, (segments+1)*2*3)
+	for i := 0; i <= segments; i++ {
+		t := float32(i) / float32(segments)
+		x := -halfWidth + t*halfWidth*2
+		centerZ := amplitude * float32(math.Sin(float64(x/wavelength*2*math.Pi)))
+		verts = append(verts, x, y, centerZ-halfThickness)
+		verts = append(verts, x, y, centerZ+halfThickness)
+	}
+	return verts
+}
+
+// waveRibbonIndices は、waveRibbonVertices(segments指定)が返す頂点列を
+// 三角形に組み立てるためのインデックス。
+func waveRibbonIndices(segments int) []uint16 {
+	indices := make([]uint16, 0, segments*6)
+	for i := 0; i < segments; i++ {
+		a := uint16(i * 2)
+		b := a + 1
+		c := a + 2
+		d := a + 3
+		indices = append(indices, a, b, c, b, d, c)
+	}
+	return indices
 }
