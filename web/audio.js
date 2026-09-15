@@ -130,3 +130,34 @@ function stopNote(note) {
   vibrato.stop(now + 0.1);
   noiseSource.stop(now + 0.1);
 }
+
+// confirmationFanfareAudio は、時の歌・馬の歌を正しく演奏した際の確認音
+// (「テレレレレ」)として使う効果音ファイル。以前はオシレーターの合成音
+// だったが、本家のゼルダの効果音そのものに差し替えている。
+const confirmationFanfareAudio = new Audio('assets/audio/song-of-time-confirmation.mp3');
+
+// playConfirmationFanfare は確認音を最初から再生する。連続して演奏された
+// 場合に備え、再生中でも頭出しし直す。
+//
+// この関数はGoからjs.Value.Call経由で呼ばれるため、ここで例外を投げると
+// Go側でパニックとなりWASMプログラム全体がクラッシュしてしまう
+// (Go program has already exitedとして以後の呼び出しが全て失敗する)。
+// currentTimeへの代入は、音声のメタデータがまだ読み込まれていない
+// (readyStateがHAVE_NOTHINGの)場合にInvalidStateErrorを同期的に投げる
+// ことがあるため、必ずtry/catchで守る。play()自体が例外を投げる場合に
+// 備えて全体もtry/catchで囲む(Promiseの拒否はcatch()で別途処理する)。
+function playConfirmationFanfare() {
+  try {
+    confirmationFanfareAudio.currentTime = 0;
+  } catch (err) {
+    // 再生位置を頭出しできなくても致命的ではないため無視する。
+  }
+  try {
+    const playResult = confirmationFanfareAudio.play();
+    if (playResult && typeof playResult.catch === 'function') {
+      playResult.catch(() => {});
+    }
+  } catch (err) {
+    // 自動再生ポリシー等で再生できなくても致命的ではないため無視する。
+  }
+}

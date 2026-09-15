@@ -124,18 +124,45 @@ func setSleepHookForTest(f func(time.Duration)) (restore func()) {
 	}
 }
 
-func TestPlaySongOfTimeAudio_PlaysConfirmationThenContinuation(t *testing.T) {
+func TestPlayConfirmationFanfare_CallsHookAndSleepsForItsDuration(t *testing.T) {
+	called := 0
+	var sleptFor time.Duration
+	playConfirmationFanfare(func() { called++ }, func(d time.Duration) { sleptFor = d })
+
+	if called != 1 {
+		t.Fatalf("expected the fanfare hook to be called once, got %d", called)
+	}
+	if sleptFor != music.ConfirmationFanfareDuration {
+		t.Errorf("slept for %v, want %v (music.ConfirmationFanfareDuration)", sleptFor, music.ConfirmationFanfareDuration)
+	}
+}
+
+func TestPlayConfirmationFanfare_NilHookDoesNothing(t *testing.T) {
+	slept := false
+	playConfirmationFanfare(nil, func(time.Duration) { slept = true })
+
+	if slept {
+		t.Fatal("expected no sleep when the fanfare hook is not registered")
+	}
+}
+
+func TestPlaySongOfTimeAudio_PlaysConfirmationFanfareThenContinuation(t *testing.T) {
 	defer setSleepHookForTest(func(time.Duration) {})()
 
+	fanfareCalls := 0
+	SetPlayConfirmationFanfareFunc(func() { fanfareCalls++ })
 	var played, stopped []int
 	SetPlayNoteFunc(func(note, velocity int) { played = append(played, note) })
 	SetStopNoteFunc(func(note int) { stopped = append(stopped, note) })
-	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+	defer func() { SetPlayConfirmationFanfareFunc(nil); SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	playSongOfTimeAudio()
 
-	want := append(append([]music.ContinuationNote{}, music.SongOfTimeConfirmation...), music.SongOfTimeOpening...)
-	want = append(want, music.SongOfTimeContinuation...)
+	if fanfareCalls != 1 {
+		t.Fatalf("expected the confirmation fanfare (mp3) to be played once, got %d calls", fanfareCalls)
+	}
+
+	want := append(append([]music.ContinuationNote{}, music.SongOfTimeOpening...), music.SongOfTimeContinuation...)
 	if len(played) != len(want) {
 		t.Fatalf("played %d notes, want %d", len(played), len(want))
 	}
@@ -153,11 +180,12 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 	songOfTimePlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
 
-	wantTotal := len(music.SongOfTimeConfirmation) + len(music.SongOfTimeOpening) + len(music.SongOfTimeContinuation)
+	wantTotal := len(music.SongOfTimeOpening) + len(music.SongOfTimeContinuation)
 
 	done := make(chan struct{})
 	var mu sync.Mutex
 	var played []int
+	SetPlayConfirmationFanfareFunc(func() {})
 	SetPlayNoteFunc(func(note, velocity int) {
 		mu.Lock()
 		played = append(played, note)
@@ -168,7 +196,7 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 		}
 	})
 	SetStopNoteFunc(func(note int) {})
-	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+	defer func() { SetPlayConfirmationFanfareFunc(nil); SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	onMelodyRecorded(songOfTime)
 
@@ -206,11 +234,12 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 	horseSongPlayed = false
 	defer setSleepHookForTest(func(time.Duration) {})()
 
-	wantTotal := len(music.SongOfTimeConfirmation) + len(music.HorseSongContinuation)
+	wantTotal := len(music.HorseSongContinuation)
 
 	done := make(chan struct{})
 	var mu sync.Mutex
 	var played []int
+	SetPlayConfirmationFanfareFunc(func() {})
 	SetPlayNoteFunc(func(note, velocity int) {
 		mu.Lock()
 		played = append(played, note)
@@ -221,7 +250,7 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 		}
 	})
 	SetStopNoteFunc(func(note int) {})
-	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+	defer func() { SetPlayConfirmationFanfareFunc(nil); SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	onMelodyRecorded(horseSong)
 

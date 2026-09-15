@@ -41,30 +41,23 @@ const (
 	continuationLongDur   = 700 * time.Millisecond    // 「ー」1個で伸ばす音(2拍分)
 	continuationLongDur2  = 3 * continuationNormalDur // 「ーー」2個で伸ばす音(3拍分)
 	continuationLongDur3  = 4 * continuationNormalDur // 「ーーー」3個で伸ばす音(4拍分)
-	confirmationNoteDur   = 120 * time.Millisecond    // 「テレレレレ」の確認音は短く刻む
 
-	// SongOfTimePauseDur は、確認音(SongOfTimeConfirmation)が鳴り終わって
-	// から曲の続き(SongOfTimeContinuation等)が始まるまでの間(1拍分)。
+	// SongOfTimePauseDur は、確認音(ConfirmationFanfareDuration、mp3の
+	// 効果音)が鳴り終わってから曲の続き(SongOfTimeContinuation等)が
+	// 始まるまでの間(1拍分)。
 	SongOfTimePauseDur = continuationNormalDur
+
+	// ConfirmationFanfareDuration は、時の歌・馬の歌を正しく演奏した直後に
+	// 鳴らす確認音(「テレレレレ」、mp3の効果音、
+	// web/assets/audio/song-of-time-confirmation.mp3)の再生時間。
+	// internal/game.playConfirmationFanfareが、この時間だけ待ってから
+	// 曲の続きを再生し始める。元のmp3は末尾に約1.6秒の無音があり、続きの
+	// 再生が始まるまでが間延びして遅く感じたため、無音部分をffmpegで
+	// 切り詰めた(音が鳴り終わるのは約0.79秒)0.9秒の音声に差し替えている。
+	ConfirmationFanfareDuration = 900 * time.Millisecond
 )
 
-// SongOfTimeConfirmation は、プレイヤーがSongOfTimeName(前半6音)を正しく
-// 演奏した直後に鳴る、本家のゼルダのような短い確認音(「テレレレレ」)。
-// オクターブ指定が無いため、続きのメロディ(SongOfTimeContinuation)より
-// 1オクターブ高い6オクターブで鳴らしている。
-// ソ₆→ファ#₆→レ#₆→ラ₆→ソ#₆→ミ₆→ソ#₆→ド₆
-var SongOfTimeConfirmation = []ContinuationNote{
-	{MIDINote: 91, Duration: confirmationNoteDur}, // ソ₆
-	{MIDINote: 90, Duration: confirmationNoteDur}, // ファ#₆
-	{MIDINote: 87, Duration: confirmationNoteDur}, // レ#₆
-	{MIDINote: 93, Duration: confirmationNoteDur}, // ラ₆
-	{MIDINote: 92, Duration: confirmationNoteDur}, // ソ#₆
-	{MIDINote: 88, Duration: confirmationNoteDur}, // ミ₆
-	{MIDINote: 92, Duration: confirmationNoteDur}, // ソ#₆
-	{MIDINote: 84, Duration: confirmationNoteDur}, // ド₆
-}
-
-// SongOfTimeOpening は、確認音(SongOfTimeConfirmation)の後に自動再生する
+// SongOfTimeOpening は、確認音(ConfirmationFanfareDuration)の後に自動再生する
 // 「時の歌」の冒頭部分(=SongOfTimeNameのPitchesと同じ音: ラ→レ→ファ→ラ→
 // レ→ファ)を、実際に鳴らすためのMIDIノート番号・長さ付きで表したもの。
 // 本家のゼルダは確認音の後に曲を最初から(プレイヤーが演奏した部分も
@@ -97,8 +90,8 @@ var SongOfTimeContinuation = []ContinuationNote{
 }
 
 // HorseSongContinuation は、プレイヤーがHorseSongName(レ→シ→ラ→レ→シ→ラ)を
-// 正しく演奏した後、確認音(SongOfTimeConfirmationを共用)に続けて
-// 自動再生される「馬の歌」の続き。1オクターブ上げて6オクターブで鳴らす。
+// 正しく演奏した後、確認音(ConfirmationFanfareDuration、時の歌と共用)に
+// 続けて自動再生される「馬の歌」の続き。1オクターブ上げて6オクターブで鳴らす。
 // レ→シ→ラーー→レ→シ→ラーー→レ→シ→ラー→シー→ラー
 var HorseSongContinuation = []ContinuationNote{
 	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
