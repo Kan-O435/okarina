@@ -7,25 +7,37 @@
 <style>
   body {
     justify-content: center;
-    min-height: 100vh;
-    padding-bottom: 0;
     background: #000;
   }
-  #ending {
+  #ending-text {
+    position: absolute;
+    left: 50%;
+    bottom: 6%;
+    transform: translateX(-50%);
+    width: 84%;
+    max-width: 640px;
+    box-sizing: border-box;
     text-align: center;
+    padding: 20px 24px;
+    background: rgba(20, 25, 40, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
     opacity: 0;
-    animation: fade-in 2.5s ease-out forwards;
+    animation: fade-in 2.5s ease-out 1s forwards;
+    pointer-events: none;
   }
-  #ending h1 {
-    font-size: 22px;
+  #ending-text h1 {
+    font-size: 20px;
     font-weight: normal;
     letter-spacing: 0.15em;
-    margin-bottom: 16px;
+    margin: 0 0 14px;
+    color: #fff;
   }
-  #ending p {
+  #ending-text p {
     font-size: 13px;
-    color: #aaa;
+    color: #eee;
     line-height: 1.8;
+    margin: 0;
   }
   @keyframes fade-in {
     from { opacity: 0; }
@@ -35,13 +47,19 @@
 </head>
 <body>
 
-<div id="ending">
-  <h1>ガノンは、ついに倒れた。</h1>
-  <p>
-    嵐は去り、静寂が戦場跡を包む。<br>
-    ハックツの伝説 時のオカリナ - おわり
-  </p>
+<div id="canvas-wrap">
+  <canvas id="game-canvas" width="800" height="600"></canvas>
+  <div id="ending-text">
+    <h1>ガノンは、ついに倒れた。</h1>
+    <p>
+      嵐は去り、静寂が花畑を包む。<br>
+      ハックツの伝説 時のオカリナ - おわり
+    </p>
+  </div>
 </div>
+
+<script src="wasm_exec.js"></script>
+<script src="ending.js"></script>
 
 </body>
 </html>

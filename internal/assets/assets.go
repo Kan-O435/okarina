@@ -226,3 +226,28 @@ var GanonLightning []byte
 //
 //go:embed models/storm-cloud.glb
 var GanonStormCloud []byte
+
+// Zelda は、エンディング画面でLinkと向かい合って立つゼルダ姫のGLB
+// (ユーザー提供、Ocarina of Time風ファンアートモデル)。LinkKnightと同じく
+// スキンは無くパーツごとに別メッシュ・別テクスチャへ分かれているため、
+// LoadGLBParts/CombinedGroundTransformで読み込む
+// (internal/renderer/ending.go参照)。
+//
+//go:embed models/zelda.glb
+var Zelda []byte
+
+// FlowerFieldTexture は、エンディング画面の地面に貼る花畑のテクスチャ
+// (緑の草地に白・黄・ピンク・紫の小さな花を散らした模様)。自作の手続き
+// 生成画像(internal/renderer/grassland.goのGrasslandGroundTexture等と
+// 同様のアプローチ)。
+//
+//go:embed textures/flower-field.png
+var FlowerFieldTexture []byte
+
+// PetalTexture は、エンディング画面で舞い散る花びら1枚分のテクスチャ
+// (背景透過PNG、先端に切れ込みのある桜の花びらのシルエット)。自作の
+// 手続き生成画像。1枚のメッシュ・テクスチャを全ての花びらのObjectで
+// 使い回す(internal/renderer/ending.go参照)。
+//
+//go:embed textures/petal.png
+var PetalTexture []byte
