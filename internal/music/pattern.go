@@ -98,20 +98,20 @@ var SongOfTimeContinuation = []ContinuationNote{
 
 // HorseSongContinuation は、プレイヤーがHorseSongName(レ→シ→ラ→レ→シ→ラ)を
 // 正しく演奏した後、確認音(SongOfTimeConfirmationを共用)に続けて
-// 自動再生される「馬の歌」の続き。
-// レ→シ→ラーーー→レ→シ→ラーー→レ→シ→ラー→レ→ラーー
+// 自動再生される「馬の歌」の続き。1オクターブ上げて6オクターブで鳴らす。
+// レ→シ→ラーー→レ→シ→ラーー→レ→シ→ラー→シー→ラー
 var HorseSongContinuation = []ContinuationNote{
-	{MIDINote: 74, Duration: continuationNormalDur}, // レ₅
-	{MIDINote: 71, Duration: continuationNormalDur}, // シ₄
-	{MIDINote: 69, Duration: continuationLongDur3},  // ラ₄ーーー
-	{MIDINote: 74, Duration: continuationNormalDur}, // レ₅
-	{MIDINote: 71, Duration: continuationNormalDur}, // シ₄
-	{MIDINote: 69, Duration: continuationLongDur2},  // ラ₄ーー
-	{MIDINote: 74, Duration: continuationNormalDur}, // レ₅
-	{MIDINote: 71, Duration: continuationNormalDur}, // シ₄
-	{MIDINote: 69, Duration: continuationLongDur},   // ラ₄ー
-	{MIDINote: 74, Duration: continuationNormalDur}, // レ₅
-	{MIDINote: 69, Duration: continuationLongDur2},  // ラ₄ーー
+	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
+	{MIDINote: 83, Duration: continuationNormalDur}, // シ₅
+	{MIDINote: 81, Duration: continuationLongDur2},  // ラ₅ーー
+	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
+	{MIDINote: 83, Duration: continuationNormalDur}, // シ₅
+	{MIDINote: 81, Duration: continuationLongDur2},  // ラ₅ーー
+	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
+	{MIDINote: 83, Duration: continuationNormalDur}, // シ₅
+	{MIDINote: 81, Duration: continuationLongDur},   // ラ₅ー
+	{MIDINote: 83, Duration: continuationLongDur},   // シ₅ー
+	{MIDINote: 81, Duration: continuationLongDur},   // ラ₅ー
 }
 
 // Recognize は演奏されたMelodyが登録済みPatternのいずれかと完全一致するか判定する。
