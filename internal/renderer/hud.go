@@ -17,6 +17,10 @@ const horseSongSheetAspect = 1600.0 / 619.0
 // (1600x620px、ユーザー提供のバナー)の横:縦比。
 const ganonHallMelodySheetAspect = 1600.0 / 620.0
 
+// ganonBattleMelodySheetAspect は「嵐の歌」楽譜画像(1600x620px、
+// ユーザー提供のバナー)の横:縦比。
+const ganonBattleMelodySheetAspect = 1600.0 / 620.0
+
 // HUD は、3Dシーンとは独立してスクリーン座標(ピクセル、Y下向き)に固定
 // 表示する2Dオーバーレイ(時の歌・馬の歌の楽譜など)を描画するための
 // 最小限の仕組み。
@@ -45,6 +49,13 @@ func BuildHorseSongSheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
 // の実サイズ(Context.CanvasSize())。
 func BuildGanonHallMelodySheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
 	return buildImageHUD(c, assets.GanonHallMelodySheetTexture, ganonHallMelodySheetAspect, widthPx, heightPx)
+}
+
+// BuildGanonBattleMelodySheetHUD は「嵐の歌」の楽譜バナーを、canvas上部
+// 中央に配置するHUDとして組み立てる。widthPx/heightPxはcanvasの実サイズ
+// (Context.CanvasSize())。
+func BuildGanonBattleMelodySheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
+	return buildImageHUD(c, assets.GanonBattleMelodySheetTexture, ganonBattleMelodySheetAspect, widthPx, heightPx)
 }
 
 // buildImageHUD は、背景透過PNG(textureData)をcanvas上部中央に配置する

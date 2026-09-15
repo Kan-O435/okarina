@@ -5,6 +5,7 @@ import (
 	"runtime"
 
 	"github.com/Kan-O435/okarina/internal/bridge"
+	"github.com/Kan-O435/okarina/internal/game"
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
 	"github.com/Kan-O435/okarina/internal/vecmath"
@@ -52,14 +53,18 @@ func main() {
 		width, height := ctx.CanvasSize()
 		ctx.Viewport(width, height)
 		ctx.EnableDepthTest()
+		ctx.EnableBlend()                     // 楽譜HUD(透過テクスチャ)を正しく合成するため
 		ctx.ClearColor(0.15, 0.05, 0.05, 1.0) // 暗く不穏な赤黒い空気
 
 		scene, link, err := renderer.BuildGanonScene(ctx, renderer.GanonBackgroundBattle)
 		rockParts, rockPartsErr := renderer.LoadRockDebrisParts(ctx)
+		melodySheetHUD, melodySheetErr := renderer.BuildGanonBattleMelodySheetHUD(ctx, width, height)
 		if err != nil {
 			fmt.Println("renderer: failed to build ganon scene:", err)
 		} else if rockPartsErr != nil {
 			fmt.Println("renderer: failed to load rock debris parts:", rockPartsErr)
+		} else if melodySheetErr != nil {
+			fmt.Println("renderer: failed to build ganon battle melody sheet HUD:", melodySheetErr)
 		} else {
 			player.Player.SpawnAt(link.SpawnZ)
 			renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
@@ -83,6 +88,12 @@ func main() {
 					scene.Objects[wipeIndex].Transform = vecmath.Translate(vecmath.NewVec3(0, wipeY, ganonBattleWipeRockZ)).Mul(wipeLocalTransform)
 				}
 				scene.Render(ctx)
+
+				// 嵐の歌の楽譜は、撃破演出が始まる前(まだ正しく演奏できて
+				// いない間)だけ表示する。
+				if !game.GanonBattleMelodyPlayed() {
+					melodySheetHUD.Render(ctx, width, height)
+				}
 			})
 			fmt.Println("renderer: ganon (battle) scene rendered, game loop started")
 		}

@@ -188,3 +188,12 @@ var TitleOcarina []byte
 //
 //go:embed textures/ganon-hall-melody-sheet.png
 var GanonHallMelodySheetTexture []byte
+
+// GanonBattleMelodySheetTexture は、戦場跡でGanonの最終形態を倒す合図
+// 「嵐の歌」(レ→ファ→レ→レ→ファ→レ)の楽譜を表すバナー画像
+// (背景透過PNG、ユーザー提供)。撃破演出が始まる前だけHUDとして表示する
+// (internal/renderer.BuildGanonBattleMelodySheetHUD、
+// game.GanonBattleMelodyPlayed参照)。
+//
+//go:embed textures/ganon-battle-melody-sheet.png
+var GanonBattleMelodySheetTexture []byte
