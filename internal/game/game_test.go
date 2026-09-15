@@ -235,55 +235,58 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 // resetJumpGesture はジャンプジェスチャーの検出状態をテスト用に初期化する。
 func resetJumpGesture() {
 	jumpGestureLow = false
-	jumpGestureCount = 0
 }
 
-func TestOnPitchDetected_TwoLowNotesTriggerJump(t *testing.T) {
+func TestOnPitchDetected_LowNoteTriggersJump(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
 	SetJumpTrigger(func() { triggered++ })
 	defer SetJumpTrigger(nil)
 
-	OnPitchDetected(100) // 1回目の低い音(立ち上がり)
-	if triggered != 0 {
-		t.Fatalf("expected no trigger after only one low note, got %d", triggered)
-	}
-
-	OnPitchDetected(0)   // 無音(1回目の低い音が終わる)
-	OnPitchDetected(120) // 2回目の低い音(立ち上がり) → 発火するはず
+	OnPitchDetected(100) // 低い音の立ち上がり → 即座に発火するはず
 	if triggered != 1 {
-		t.Fatalf("expected exactly one trigger after two low notes, got %d", triggered)
+		t.Fatalf("expected exactly one trigger after a single low note, got %d", triggered)
 	}
 }
 
-func TestOnPitchDetected_SustainedLowNoteCountsOnce(t *testing.T) {
+func TestOnPitchDetected_SustainedLowNoteTriggersOnce(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
 	SetJumpTrigger(func() { triggered++ })
 	defer SetJumpTrigger(nil)
 
-	// 同じ低い音を無音を挟まず連続で読み取っても、1回とカウントする。
+	// 同じ低い音を無音を挟まず連続で読み取っても、立ち上がりの1回だけ発火する。
 	for i := 0; i < 5; i++ {
 		OnPitchDetected(100)
 	}
-	if triggered != 0 {
-		t.Fatalf("expected sustained low pitch readings to count as a single onset, got %d triggers", triggered)
+	if triggered != 1 {
+		t.Fatalf("expected sustained low pitch readings to trigger only once, got %d triggers", triggered)
 	}
 }
 
-func TestOnPitchDetected_HighNoteResetsJumpGesture(t *testing.T) {
+func TestOnPitchDetected_LowNoteAfterSilenceTriggersAgain(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
 	SetJumpTrigger(func() { triggered++ })
 	defer SetJumpTrigger(nil)
 
-	OnPitchDetected(100) // 1回目の低い音
-	OnPitchDetected(0)
-	OnPitchDetected(440) // 明確に高い音 → カウントリセット
-	OnPitchDetected(0)
-	OnPitchDetected(120) // これは(リセット後の)1回目扱いのはず
+	OnPitchDetected(100) // 1回目の低い音 → 発火
+	OnPitchDetected(0)   // 無音
+	OnPitchDetected(120) // 2回目の低い音(新たな立ち上がり) → 再び発火するはず
+	if triggered != 2 {
+		t.Fatalf("expected a new low note after silence to trigger again, got %d triggers", triggered)
+	}
+}
+
+func TestOnPitchDetected_HighNoteDoesNotTriggerJump(t *testing.T) {
+	resetJumpGesture()
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	OnPitchDetected(440) // 明確に高い音 → 発火しない
 	if triggered != 0 {
-		t.Fatalf("expected the gesture count to reset after a clearly high note, got %d triggers", triggered)
+		t.Fatalf("expected a high note not to trigger a jump, got %d triggers", triggered)
 	}
 }
 
