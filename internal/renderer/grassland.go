@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"math"
 	"sort"
 
 	"github.com/Kan-O435/okarina/internal/assets"
@@ -94,10 +95,16 @@ const GrasslandCameraTransitionDuration = 1.5
 // ような横視点カメラのパラメータ。X軸の正方向から見下ろすことで、
 // プレイヤーの前後移動(Z軸)がそのまま画面の左右移動に見える構図になり、
 // 障害物のジャンプ(Y方向)が縦の動きとしてはっきり見えるようになる
-// (アスレチック的な難易度を作りやすくするため)。
+// (アスレチック的な難易度を作りやすくするため)。地面に起伏
+// (grasslandTerrainHeight)を付けたことに伴い調整した値: Distance(旧10)を
+// 14にして、起伏が始まる境界(grasslandTerrainFlatHalfWidth=55)まで
+// カメラから十分な余裕を持たせ、起伏が近距離の壁のように見えないように
+// している(横視点カメラはX軸方向を見るため、地面の起伏の立ち上がり方が
+// そのまま奥行きとして見えることに注意)。Height(旧3)も5に上げ、視線を
+// 少し見下ろし気味にして地面の起伏が自然な奥行きとして見えるようにした。
 const (
-	GrasslandSideCameraDistance   = 10.0
-	GrasslandSideCameraHeight     = 3.0
+	GrasslandSideCameraDistance   = 14.0
+	GrasslandSideCameraHeight     = 5.0
 	GrasslandSideCameraLookHeight = 1.3
 )
 
@@ -199,20 +206,98 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projecti
 	}, link, projection, nil
 }
 
+// grasslandTerrainHalfExtent は、起伏のある地面メッシュの半径。
+// grasslandGroundHalfExtent(500、道の長さに使う値)は「カメラから絶対に
+// 見えない遠さまである」ことだけを目的にした値のため、頂点を持つ実メッシュの
+// 大きさとしては過大(頂点数が無駄に増える)。カメラのfar(150)を十分
+// カバーできる200に絞っている。
+const grasslandTerrainHalfExtent = 200.0
+
+// grasslandTerrainSegments は、地面メッシュのXZ方向それぞれの分割数。
+// 大きいほど起伏が滑らかになるが、頂点数は(segments+1)^2で増える
+// (1メッシュの頂点数はuint16インデックスの上限65535に収まる必要がある。
+// 81^2=6561なので十分余裕がある)。
+const grasslandTerrainSegments = 80
+
+// grasslandTerrainFlatHalfWidth/Margin は、道・木・柵・城が並ぶ中央の帯
+// (|x| <= FlatHalfWidth)を完全に平らなまま保つための範囲と、そこから
+// 起伏へなめらかに立ち上げる幅。木(X:-5, 16)・柵(半幅2.4)・道(半幅1.8)は
+// すべてこの範囲内に収まるため、既存のY=0前提の配置(木・柵・城・
+// プレイヤー・馬の位置)を変更する必要がない。
+const (
+	grasslandTerrainFlatHalfWidth = 55.0
+	grasslandTerrainFlatMargin    = 45.0
+)
+
+// grasslandTerrainHillHeight は、起伏の最大の高さ(ワールド単位)。
+// 馬に乗った後の横視点カメラ(GrasslandSideCameraDistance=14)がFlatHalfWidth
+// の範囲内に収まるようにしているため、起伏はカメラからある程度離れた
+// ところで初めて立ち上がる。それでも近距離の急な壁のように見えないよう、
+// 高さは控えめにしている。
+const grasslandTerrainHillHeight = 5.0
+
+// grasslandTerrainHeight は、ワールド座標(x, z)における地面の高さを返す。
+// 中央の帯(|x| <= grasslandTerrainFlatHalfWidth)は常に0(平ら)、そこから
+// grasslandTerrainFlatMarginぶんかけてsmoothstepでなめらかに起伏を
+// 立ち上げる(段差ができないようにするため)。起伏自体は、周波数の異なる
+// 2つのsin波を組み合わせただけの簡易的な手続き地形(GrasslandGroundTexture
+// のノイズと同様、厳密なパーリンノイズ等は使わない)。
+func grasslandTerrainHeight(x, z float64) float64 {
+	dist := math.Abs(x) - grasslandTerrainFlatHalfWidth
+	if dist <= 0 {
+		return 0
+	}
+	t := dist / grasslandTerrainFlatMargin
+	if t > 1 {
+		t = 1
+	}
+	blend := t * t * (3 - 2*t) // smoothstep
+
+	wave := math.Sin(x*0.045+z*0.03)*0.6 + math.Sin(x*0.11-z*0.08+1.7)*0.4
+	return blend * grasslandTerrainHillHeight * (wave*0.5 + 0.5)
+}
+
 // grasslandGroundObject は、internal/assets.GrasslandGroundTexture(自作の
-// 手続き生成画像、オリーブ〜黄緑〜土色のまだら模様)を貼った地面を返す。
-// 地面はカメラのfarよりずっと広い1枚のquadのため、タイリングはせず
-// そのまま(UV 0..1)貼っている。プレイヤーが実際に動き回る中心付近だけを
-// 見ることになるため、模様は大きく・ゆるやかに見える。
+// 手続き生成画像、オリーブ〜黄緑〜土色のまだら模様)を貼った、起伏のある
+// 地面を返す。grasslandTerrainHeight()で頂点ごとの高さを計算した
+// グリッドメッシュとして生成する(道・木・柵が並ぶ中央の帯は平らなまま)。
+// テクスチャは地面全体に対して1回だけ(タイリングせず、UV 0..1)貼る。
 func grasslandGroundObject(c *Context) (Object, error) {
 	texture, err := c.NewImageTexture(assets.GrasslandGroundTexture, "image/png")
 	if err != nil {
 		return Object{}, err
 	}
 
-	verts := quadVertices(grasslandGroundHalfExtent, grasslandGroundHalfExtent, 0)
-	uvs := quadUVsCropped(0, 0, 1, 1)
-	mesh := c.NewMesh(verts, uvs, quadIndices())
+	const segs = grasslandTerrainSegments
+	const half = grasslandTerrainHalfExtent
+	const stride = segs + 1
+
+	verts := make([]float32, 0, stride*stride*3)
+	uvs := make([]float32, 0, stride*stride*2)
+	for iz := 0; iz <= segs; iz++ {
+		tz := float64(iz) / float64(segs)
+		z := -half + tz*half*2
+		for ix := 0; ix <= segs; ix++ {
+			tx := float64(ix) / float64(segs)
+			x := -half + tx*half*2
+			y := grasslandTerrainHeight(x, z)
+			verts = append(verts, float32(x), float32(y), float32(z))
+			uvs = append(uvs, float32(tx), float32(tz))
+		}
+	}
+
+	indices := make([]uint16, 0, segs*segs*6)
+	for iz := 0; iz < segs; iz++ {
+		for ix := 0; ix < segs; ix++ {
+			a := uint16(iz*stride + ix)
+			b := a + 1
+			cIdx := uint16((iz+1)*stride + ix)
+			d := cIdx + 1
+			indices = append(indices, a, cIdx, b, b, cIdx, d)
+		}
+	}
+
+	mesh := c.NewMesh(verts, uvs, indices)
 	return Object{Mesh: mesh, Texture: texture, Transform: vecmath.Identity(), Color: vecmath.NewVec3(1, 1, 1)}, nil
 }
 
@@ -251,12 +336,19 @@ var grasslandCloudColor = vecmath.NewVec3(0.32, 0.24, 0.42)
 // (grasslandCastleZ=-85)・後光(grasslandHaloZ=-100)よりさらに奥、
 // 遠景の一番後ろに配置している(far=150に対して十分余裕を持たせている)。
 // PartIndexはTempleCloud(16種類)のうちどれを使うかを指定する(見た目を
-// 確認しながら手で選んだもの)。
+// 確認しながら手で選んだもの)。Heightは、demo.go側のtempleCloudPlacements
+// (1.5〜2.6)と同程度の範囲に合わせている。TempleCloudの各パーツはローカル
+// Y方向の厚みが極端に薄い(パーツ間で共通して0.0156)ため、Model.
+// GroundTransformの一様スケール(X/Y/Zとも同じ倍率)でHeightを合わせると、
+// 薄いY方向の見た目を確保する代わりにX/Z方向が極端に引き伸ばされる。以前
+// ここをHeight 5.5〜6.5にしていたところ、横視点カメラ(馬に乗った時)から
+// 見るとX/Z方向の巨大な板がほぼ真横から見えてしまい、雲が一本の線のように
+// 描画される不具合があったため、demo.go側と同程度のHeightに縮小した。
 var grasslandTempleCloudPlacements = []templeCloudPlacement{
-	{PartIndex: 0, X: -26, Y: 26, Z: -102, Height: 6.0},
-	{PartIndex: 3, X: 22, Y: 22, Z: -110, Height: 5.5},
-	{PartIndex: 5, X: 4, Y: 30, Z: -118, Height: 6.5},
-	{PartIndex: 8, X: -45, Y: 24, Z: -106, Height: 5.5},
+	{PartIndex: 0, X: -26, Y: 26, Z: -102, Height: 3.0},
+	{PartIndex: 3, X: 22, Y: 22, Z: -110, Height: 2.8},
+	{PartIndex: 5, X: 4, Y: 30, Z: -118, Height: 3.2},
+	{PartIndex: 8, X: -45, Y: 24, Z: -106, Height: 2.8},
 }
 
 // grasslandTempleCloudObjects は、internal/assets.TempleCloudから

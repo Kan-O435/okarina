@@ -22,10 +22,11 @@ func Init() {
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
 	js.Global().Set("goPreviewGanonHallCollapse", js.FuncOf(goPreviewGanonHallCollapse))
+	js.Global().Set("goSummonHorse", js.FuncOf(goSummonHorse))
 	js.Global().Set("goDebugTriggerTitleStart", js.FuncOf(goDebugTriggerTitleStart))
 	js.Global().Set("goDebugTriggerJump", js.FuncOf(goDebugTriggerJump))
 	js.Global().Set("goDebugTriggerGanonHallMelody", js.FuncOf(goDebugTriggerGanonHallMelody))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody)")
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
@@ -159,6 +160,15 @@ func goDefeatGanonFirstForm(this js.Value, args []js.Value) interface{} {
 func goPreviewGanonHallCollapse(this js.Value, args []js.Value) interface{} {
 	game.TriggerGanonHallCollapsePreview()
 	CallConsoleLog("bridge: goPreviewGanonHallCollapse() called, previewing hall collapse")
+	return nil
+}
+
+// goSummonHorse はJavaScript側(草原フィールドのデバッグ「馬に乗る」
+// ボタン)から呼び出され、馬の歌を演奏したときと同じ処理(馬を呼び出す)を
+// 演奏なしで直接実行する。
+func goSummonHorse(this js.Value, args []js.Value) interface{} {
+	game.TriggerHorseSummon()
+	CallConsoleLog("bridge: goSummonHorse() called, summoning horse")
 	return nil
 }
 

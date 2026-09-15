@@ -14,9 +14,12 @@ Attribution.
 
 Used as internal/assets/models/temple-tree.glb (internal/assets.TempleTree),
 the tree model for the temple field (cmd/game / internal/renderer/demo.go's
-treeObjects). Replaces the previous CC0 Gobkit Nature Kit low-poly trees for
-this field only; grassland/ganon fields are unaffected and continue to use
-internal/assets.Trees (Gobkit).
+treeObjects) and the grassland field (cmd/grassland / internal/renderer/
+grassland.go's grasslandTreeObjects). Replaces the previous CC0 Gobkit
+Nature Kit low-poly trees in both fields; internal/assets.Trees (Gobkit) is
+no longer referenced by any field. The ganon field does not have trees.
 
-Single mesh with an embedded base color texture, loaded with the ordinary
-LoadGLBMesh path (no skin, no parts split).
+Single mesh with an embedded base color texture. Sketchfab's "converted"
+export puts an axis-correction matrix on the root node, so it's loaded via
+gltf.ParseParts (which bakes node transforms) rather than the plain
+LoadGLBMesh path, taking parts[0] since there's only one mesh.
