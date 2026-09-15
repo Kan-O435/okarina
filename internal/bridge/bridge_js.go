@@ -22,7 +22,10 @@ func Init() {
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
 	js.Global().Set("goPreviewGanonHallCollapse", js.FuncOf(goPreviewGanonHallCollapse))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse)")
+	js.Global().Set("goDebugTriggerTitleStart", js.FuncOf(goDebugTriggerTitleStart))
+	js.Global().Set("goDebugTriggerJump", js.FuncOf(goDebugTriggerJump))
+	js.Global().Set("goDebugTriggerGanonHallMelody", js.FuncOf(goDebugTriggerGanonHallMelody))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
@@ -156,5 +159,32 @@ func goDefeatGanonFirstForm(this js.Value, args []js.Value) interface{} {
 func goPreviewGanonHallCollapse(this js.Value, args []js.Value) interface{} {
 	game.TriggerGanonHallCollapsePreview()
 	CallConsoleLog("bridge: goPreviewGanonHallCollapse() called, previewing hall collapse")
+	return nil
+}
+
+// goDebugTriggerTitleStart はJavaScript側(タイトル画面のデバッグ用Oキー)
+// から呼び出され、MIDIキーボードで「ド(C)」を弾いたのと同じ効果を発生
+// させる。
+func goDebugTriggerTitleStart(this js.Value, args []js.Value) interface{} {
+	game.DebugTriggerTitleStart()
+	CallConsoleLog("bridge: goDebugTriggerTitleStart() called (debug key)")
+	return nil
+}
+
+// goDebugTriggerJump はJavaScript側(草原フィールドのデバッグ用Oキー)から
+// 呼び出され、オタマトーンで低い音を鳴らしたのと同じジャンプジェスチャー
+// を発生させる。
+func goDebugTriggerJump(this js.Value, args []js.Value) interface{} {
+	game.DebugTriggerJump()
+	CallConsoleLog("bridge: goDebugTriggerJump() called (debug key)")
+	return nil
+}
+
+// goDebugTriggerGanonHallMelody はJavaScript側(玉座の間のデバッグ用Oキー)
+// から呼び出され、光のプレリュードを正しく演奏したのと同じ効果
+// (確認音→崩落演出)を発生させる。
+func goDebugTriggerGanonHallMelody(this js.Value, args []js.Value) interface{} {
+	game.DebugTriggerGanonHallMelody()
+	CallConsoleLog("bridge: goDebugTriggerGanonHallMelody() called (debug key)")
 	return nil
 }
