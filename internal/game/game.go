@@ -10,7 +10,6 @@ import (
 	"github.com/Kan-O435/okarina/internal/music"
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
-	"github.com/Kan-O435/okarina/internal/vecmath"
 	"github.com/Kan-O435/okarina/internal/world"
 )
 
@@ -88,9 +87,7 @@ func (g *Game) Update(dt float64) {
 
 	deltaZ := player.Player.Update(dt)
 	if deltaZ != 0 {
-		worldPos := vecmath.Translate(vecmath.NewVec3(0, 0, player.Player.Z))
-		facing := vecmath.RotateY(player.Player.Yaw)
-		g.scene.Objects[g.link.Index].Transform = worldPos.Mul(facing).Mul(g.link.LocalTransform)
+		g.scene.Objects[g.link.Index].Transform = player.Player.Transform(g.link.LocalTransform)
 	}
 
 	if g.autoWalking && !g.transitioned && player.Player.Z <= renderer.DoorPassThroughZ {
@@ -108,6 +105,26 @@ var instance *Game
 // SetInstance はブリッジ経由の呼び出し先となるGameインスタンスを登録する。
 func SetInstance(g *Game) {
 	instance = g
+}
+
+// ganonSwitcher は、ガノンフィールドの背景デザイン案(戦場跡/玉座の間)を
+// 切り替えるための関数。cmd/ganon/main.goが起動時に登録する
+// (gameパッケージはrenderer.GanonBackgroundVariant等を知る必要がないよう、
+// 文字列を受け取るだけのコールバックとして持つ)。
+var ganonSwitcher func(variant string)
+
+// SetGanonSwitcher は、ガノンフィールドの背景切り替えを行う関数を登録する。
+func SetGanonSwitcher(f func(variant string)) {
+	ganonSwitcher = f
+}
+
+// SwitchGanonBackground はブリッジ(JavaScript側)から呼ばれ、登録済みの
+// 切り替え関数を実行する。未登録の場合(ガノンフィールド以外のページ)は
+// 何もしない。
+func SwitchGanonBackground(variant string) {
+	if ganonSwitcher != nil {
+		ganonSwitcher(variant)
+	}
 }
 
 // OpenDoor はブリッジ(JavaScript側)から呼ばれ、登録済みのGameインスタンスの

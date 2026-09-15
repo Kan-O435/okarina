@@ -6,7 +6,11 @@
 // 半音(セミトーン)単位に変換してから比較する。
 package player
 
-import "math"
+import (
+	"math"
+
+	"github.com/Kan-O435/okarina/internal/vecmath"
+)
 
 // moveSpeed はワールド単位/秒での移動速度。
 const moveSpeed = 8.0
@@ -109,4 +113,14 @@ func (s *State) Update(dt float64) float64 {
 	}
 	s.Z += deltaZ
 	return deltaZ
+}
+
+// Transform は、localTransform(Linkモデル自身の原点補正・スケール)に、
+// 現在のワールド座標(Z)・向き(Yaw)を適用した最終的な配置行列を返す。
+// フィールド(神殿・草原等)を問わず、Linkの見た目を毎フレーム組み立て直す
+// 際に共通で使う。
+func (s *State) Transform(localTransform vecmath.Mat4) vecmath.Mat4 {
+	worldPos := vecmath.Translate(vecmath.NewVec3(0, 0, s.Z))
+	facing := vecmath.RotateY(s.Yaw)
+	return worldPos.Mul(facing).Mul(localTransform)
 }

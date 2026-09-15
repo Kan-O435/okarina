@@ -30,3 +30,35 @@ var DoorTexture []byte
 //
 //go:embed textures/song-of-time-sheet.png
 var SongOfTimeSheetTexture []byte
+
+// GrasslandCastle は、草原フィールドの道の先に置く「白い城」のGLB
+// (Tripo3Dで生成・リメッシュ済み、テクスチャ無しの単色モデル)。
+//
+//go:embed models/grassland-castle.glb
+var GrasslandCastle []byte
+
+// HaloTexture は、城の後ろに浮かべる白い後光(放射状グラデーション、
+// 中心が不透明な白・外側が透明)の板に貼るテクスチャ。自作の手続き生成画像。
+//
+//go:embed textures/halo.png
+var HaloTexture []byte
+
+// CloudTexture は、空に浮かべる雲の板に貼るテクスチャ(不定形の白い塊、
+// 外側が透明)。自作の手続き生成画像。色はObject.Colorで紫に着色する。
+//
+//go:embed textures/cloud.png
+var CloudTexture []byte
+
+// GanonBattleScene は、ガノンフィールドの背景となる、荒れ果てた戦場跡の
+// ジオラマのGLB(Tripo3Dで生成・リメッシュ・テクスチャ生成済み)。横長・
+// 低めの「舞台」状の形をしている。
+//
+//go:embed models/ganon-battle.glb
+var GanonBattleScene []byte
+
+// GanonHall は、ガノンフィールドの背景デザイン案として比較中の「玉座の間」
+// (Tripo3Dで生成、テクスチャ付き)。GanonBattleSceneより縦横比が立方体に
+// 近く(幅:高さ:奥行 ≈ 1.4:1:0.9)、コンパクトな形をしている。
+//
+//go:embed models/ganon-hall.glb
+var GanonHall []byte

@@ -20,7 +20,8 @@ func Init() {
 	js.Global().Set("goOnPitchDetected", js.FuncOf(goOnPitchDetected))
 	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection)")
+	js.Global().Set("goSwitchGanonBackground", js.FuncOf(goSwitchGanonBackground))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goSwitchGanonBackground)")
 
 	// JS側(web/audio.jsのplayNote/stopNote)の実装をgameパッケージに差し込む。
 	// これにより、Goから「時の歌」の続きなどを自動再生できる。
@@ -108,5 +109,18 @@ func goSetDebugDirection(this js.Value, args []js.Value) interface{} {
 		return nil
 	}
 	game.SetDebugDirection(args[0].String())
+	return nil
+}
+
+// goSwitchGanonBackground はJavaScript側(デザイン比較ボタン)から呼ばれ、
+// ガノンフィールドの背景デザイン案を切り替える。引数は"battle"(戦場跡・
+// 現行案)| "hall"(玉座の間・前案)のいずれか。ガノンフィールド以外の
+// ページで呼ばれても何も起きない。
+func goSwitchGanonBackground(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		CallConsoleLog("bridge: goSwitchGanonBackground expects 1 arg (variant)")
+		return nil
+	}
+	game.SwitchGanonBackground(args[0].String())
 	return nil
 }
