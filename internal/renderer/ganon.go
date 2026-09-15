@@ -230,11 +230,32 @@ func ganonCameraView(variant GanonBackgroundVariant) vecmath.Mat4 {
 	// 立っているため、これでボスのほぼ正面に来る)。Yも5→6に上げている
 	// (視点・注視点とも同じだけ、水平視線のまま)。
 	return vecmath.LookAt(
-		vecmath.NewVec3(0, 6, -20),
-		vecmath.NewVec3(0, 6, -38),
+		vecmath.NewVec3(0, ganonBattleCameraY, ganonBattleCameraZ),
+		vecmath.NewVec3(0, ganonBattleCameraY, -38),
 		vecmath.NewVec3(0, 1, 0),
 	)
 }
+
+// ganonBattleCameraY/Z は、戦場跡案のカメラ位置(上のganonCameraView参照)。
+// GanonHallCameraY/Z/GanonBattleCameraY/Zとして公開しているのは、崩落演出の
+// 「wipe岩」(カメラのすぐ正面に置く岩。cmd/ganon-hall, cmd/ganon-battle
+// 参照)をどちらのフィールドでもカメラ位置基準で配置できるようにするため。
+const (
+	ganonBattleCameraY = 6.0
+	ganonBattleCameraZ = -20.0
+)
+
+// GanonHallCameraY/Z, GanonBattleCameraY/Z は、それぞれのカメラのワールド
+// 位置(上のganonCameraView参照)。cmd/ganon-hall, cmd/ganon-battleが、
+// 崩落演出の「wipe岩」をカメラのすぐ正面に置くために参照する
+// (renderer.DoorPassThroughZと同様、呼び出し側が必要とする1つの座標だけを
+// 公開する形)。
+const (
+	GanonHallCameraY   = ganonHallCameraY
+	GanonHallCameraZ   = ganonHallCameraZ
+	GanonBattleCameraY = ganonBattleCameraY
+	GanonBattleCameraZ = ganonBattleCameraZ
+)
 
 func ganonGroundObject(c *Context) Object {
 	verts := quadVertices(ganonGroundHalfExtent, ganonGroundHalfExtent, 0)
@@ -348,13 +369,35 @@ func ganonLinkObject(c *Context, spawnZ, spawnY, targetHeight float64) (objs []O
 	return objs, localTransform, nil
 }
 
-// GanonHallCollapseRockColor は、玉座の間が崩れる演出で降ってくる岩の色
-// (地面と近い暗めの岩肌色)。
-var GanonHallCollapseRockColor = vecmath.NewVec3(0.32, 0.26, 0.21)
+// LoadRockDebrisParts は、崩落演出・ページ遷移のwipe岩で使う岩モデル
+// (internal/assets.RockDebris)の全パーツ(19個、大小さまざま)を読み込む。
+// 呼び出し側(cmd/ganon-hall, cmd/ganon-battle)は起動時に1回だけ呼び、
+// 結果を毎回のGanonHallCollapseRockObject/GanonWipeRockObjectで使い回す。
+func LoadRockDebrisParts(c *Context) ([]*Model, error) {
+	prims, err := gltf.ParseParts(assets.RockDebris)
+	if err != nil {
+		return nil, err
+	}
+	parts := make([]*Model, len(prims))
+	for i := range prims {
+		model, err := c.buildModel(&prims[i])
+		if err != nil {
+			return nil, err
+		}
+		parts[i] = model
+	}
+	return parts, nil
+}
+
+// ganonHallCollapseRockPartIndices は、崩落演出で降らせる岩(下の
+// GanonHallCollapseRockPlacements)に割り当てるパーツ(RockDebrisの
+// インデックス、大小混ぜている)。Placementsと同じ数だけ順番に対応させる。
+var ganonHallCollapseRockPartIndices = []int{4, 8, 12, 1, 9, 16}
 
 // GanonHallCollapseRockPlacement は、崩落演出で降らせる岩1個ぶんの
-// X/Z位置(固定)と半サイズ。Yは時間経過で上から下へ動かすため、
-// ここには含めない(cmd/ganon-hall/main.goが毎フレーム計算する)。
+// X/Z位置(固定)と半サイズ(見た目の高さ=HalfSize*2になるよう
+// スケールする)。Yは時間経過で上から下へ動かすため、ここには含めない
+// (cmd/ganon-hall/main.goが毎フレーム計算する)。
 type GanonHallCollapseRockPlacement struct {
 	X, Z, HalfSize float64
 }
@@ -374,13 +417,83 @@ var GanonHallCollapseRockPlacements = []GanonHallCollapseRockPlacement{
 	{X: -3.4, Z: -39.0, HalfSize: 1.0},
 }
 
-// GanonHallCollapseRockObject は、崩落演出用の岩1個ぶんのObjectを、
-// 指定したワールドY(呼び出し側が毎フレーム更新する)で組み立てる。
-// 見た目は単色の直方体(boxVertices/boxIndices、テクスチャ無し)で十分と
-// 判断し、専用モデルは用意していない。
-func GanonHallCollapseRockObject(c *Context, p GanonHallCollapseRockPlacement, y float64) Object {
-	verts := boxVertices(float32(p.HalfSize), float32(p.HalfSize*2), float32(p.HalfSize))
-	mesh := c.NewMesh(verts, zeroUVs(8), boxIndices())
-	transform := vecmath.Translate(vecmath.NewVec3(p.X, y, p.Z))
-	return Object{Mesh: mesh, Transform: transform, Color: GanonHallCollapseRockColor}
+// GanonHallCollapseRockObject は、崩落演出用の岩1個ぶんのObjectと
+// localTransform(原点中心・見た目の高さ=HalfSize*2に正規化・パーツごとに
+// 少しずつ向きを変えて単調にならないようにしたもの)を組み立てる。
+// 呼び出し側は毎フレーム Translate(p.X, y, p.Z).Mul(localTransform) で
+// Transformを更新する(ganonLinkObject等と同じ構成)。
+// partsはLoadRockDebrisPartsの結果、seedIndexはPlacements内での通し番号
+// (ganonHallCollapseRockPartIndicesの選択・向きのバリエーションに使う)。
+func GanonHallCollapseRockObject(parts []*Model, seedIndex int, p GanonHallCollapseRockPlacement) (obj Object, localTransform vecmath.Mat4) {
+	part := parts[ganonHallCollapseRockPartIndices[seedIndex%len(ganonHallCollapseRockPartIndices)]]
+	ground := part.GroundTransform(0, 0, p.HalfSize*2)
+	yaw := vecmath.RotateY(vecmath.Radians(float64(seedIndex) * 53.0))
+	localTransform = yaw.Mul(ground)
+	obj = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: localTransform, Color: part.Color}
+	return obj, localTransform
+}
+
+// ganonWipeRockPartIndex/HalfSize は、崩落演出のクライマックスで画面を
+// 覆う「wipe岩」に使うパーツと見た目の大きさ(高さ=HalfSize*2)。他の
+// 岩より大きめの塊(Big_2、3550頂点)を使い、カメラのすぐ正面(1.5手前)を
+// 落下させることで、近距離ゆえに画面全体を覆って見えるようにする
+// (実際に画面いっぱいに覆えているかはcmd/ganon-hall, cmd/ganon-battle側で
+// 目視確認・調整する)。
+const (
+	ganonWipeRockPartIndex = 5
+	ganonWipeRockHalfSize  = 1.5
+)
+
+// GanonWipeRockObject は、玉座の間→戦場跡のページ遷移演出で使う「wipe岩」
+// (画面を覆いながら通り過ぎることで、遷移の継ぎ目を岩の動きに紛れさせる
+// ための岩)のObjectとlocalTransformを組み立てる。X/Zは呼び出し側が毎フレーム
+// Translate(x, y, z).Mul(localTransform)で指定する(GanonHallCollapseRockObjectと
+// 同じ構成)。玉座の間側(降ってきて画面を覆う)・戦場跡側(画面を覆った
+// 状態から通り過ぎて場面を見せる)の両方で同じパーツ・同じ大きさを使う。
+func GanonWipeRockObject(parts []*Model) (obj Object, localTransform vecmath.Mat4) {
+	part := parts[ganonWipeRockPartIndex]
+	localTransform = part.GroundTransform(0, 0, ganonWipeRockHalfSize*2)
+	obj = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: localTransform, Color: part.Color}
+	return obj, localTransform
+}
+
+// ganonHallSmokeColor は、Ganon撃破演出の煙玉の色(暗めのグレー)。
+var ganonHallSmokeColor = vecmath.NewVec3(0.25, 0.25, 0.28)
+
+// GanonHallSmokePuffPlacement は、Ganon撃破演出で立ち上る煙玉1つぶんの
+// 開始位置・開始/終了時の半径・立ち上る高さ。呼び出し側(cmd/ganon-hall/
+// main.go)は、経過時間の割合t(0→1)から
+//
+//	size := StartHalfSize + (EndHalfSize-StartHalfSize)*t
+//	y    := Y + RiseHeight*t
+//
+// を計算し、Translate(X, y, Z).Mul(Scale(size, size, 1))でTransformを
+// 更新する(GanonHallSmokeObjectが返す単位quadに対して適用する)。
+type GanonHallSmokePuffPlacement struct {
+	X, Y, Z                    float64
+	StartHalfSize, EndHalfSize float64
+	RiseHeight                 float64
+}
+
+// GanonHallSmokePuffPlacements は、Ganonを倒した際に立ち上る煙玉の配置
+// 一覧。ganonBossHallZ付近、Ganonの胴〜頭の高さ(ganonBossHallY〜+Height)
+// を包むように、3つを少しずつ左右・前後にずらして配置している。
+var GanonHallSmokePuffPlacements = []GanonHallSmokePuffPlacement{
+	{X: -0.6, Y: ganonBossHallY + ganonBossHallHeight*0.4, Z: ganonBossHallZ + 0.3, StartHalfSize: 0.4, EndHalfSize: 1.3, RiseHeight: 1.6},
+	{X: 0.5, Y: ganonBossHallY + ganonBossHallHeight*0.6, Z: ganonBossHallZ - 0.2, StartHalfSize: 0.3, EndHalfSize: 1.1, RiseHeight: 2.0},
+	{X: 0.0, Y: ganonBossHallY + ganonBossHallHeight*0.8, Z: ganonBossHallZ + 0.6, StartHalfSize: 0.35, EndHalfSize: 1.2, RiseHeight: 1.8},
+}
+
+// GanonHallSmokeObject は、煙玉用の単位サイズ(半径1)のquadのObjectを
+// 組み立てる(テクスチャはinternal/assets.CloudTexture、色は暗めのグレー)。
+// 呼び出し側はGanonHallSmokePuffPlacementsの数だけこのObjectをコピーし、
+// 別々のTransformを与えて使う(Mesh/Textureは使い回して問題ない)。
+func GanonHallSmokeObject(c *Context) (Object, error) {
+	texture, err := c.NewImageTexture(assets.CloudTexture, "image/png")
+	if err != nil {
+		return Object{}, err
+	}
+	verts := centeredQuadVertices(1, 1)
+	mesh := c.NewMesh(verts, quadUVsCropped(0, 0, 1, 1), quadIndices())
+	return Object{Mesh: mesh, Texture: texture, Color: ganonHallSmokeColor}, nil
 }

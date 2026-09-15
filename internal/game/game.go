@@ -149,6 +149,27 @@ func TriggerGanonHallCollapse() {
 	}
 }
 
+// ganonHallCollapsePreviewTrigger は、崩落演出を「テスト再生」する(戦場跡
+// フィールドへは遷移せず、その場で岩が降って落ち着くところまでを見せて
+// 元の状態に戻す)関数。cmd/ganon-hall/main.goが起動時に登録する
+// (ganonHallCollapseTriggerと同様のコールバックパターン)。
+var ganonHallCollapsePreviewTrigger func()
+
+// SetGanonHallCollapsePreviewTrigger は、崩落演出のテスト再生を開始する
+// 関数を登録する。
+func SetGanonHallCollapsePreviewTrigger(f func()) {
+	ganonHallCollapsePreviewTrigger = f
+}
+
+// TriggerGanonHallCollapsePreview はブリッジ(JavaScript側)から呼ばれ、
+// 登録済みの崩落演出テスト再生関数を実行する。未登録の場合(玉座の間
+// フィールド以外のページ)は何もしない。
+func TriggerGanonHallCollapsePreview() {
+	if ganonHallCollapsePreviewTrigger != nil {
+		ganonHallCollapsePreviewTrigger()
+	}
+}
+
 // jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
 // 低い音を1回鳴らすだけでジャンプを発生させる(馬に乗っている間に
 // 障害物を飛び越える、といった用途に使う)。以前は「低い音を2回」の
