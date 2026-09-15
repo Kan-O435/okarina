@@ -268,20 +268,23 @@ func HorseSongPlayed() bool {
 	return horseSongPlayed
 }
 
-// audioHooksMu は、下のplayNoteHook・stopNoteHook・sleepHookへの読み書きを
-// 保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の続きを再生する
-// ため、bridge.Init()での差し込みやテストでの差し替えと同時に読まれても
-// 安全なようにしている。
+// audioHooksMu は、下のplayNoteHook・stopNoteHook・playConfirmationFanfareHook・
+// sleepHookへの読み書きを保護する。onMelodyRecordedはgoroutineを起動して
+// 非同期に曲の続きを再生するため、bridge.Init()での差し込みやテストでの
+// 差し替えと同時に読まれても安全なようにしている。
 var audioHooksMu sync.Mutex
 
 // playNoteHook・stopNoteHook は、Goから直接ブラウザの音声再生(Web Audio
 // API、web/audio.jsのplayNote/stopNote)を呼び出すためのフック。
+// playConfirmationFanfareHookは、確認音(「テレレレレ」、mp3の効果音、
+// web/audio.jsのplayConfirmationFanfare)を再生するためのフック。
 // bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未初期化時は
 // nilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
 var (
-	playNoteHook func(note, velocity int)
-	stopNoteHook func(note int)
-	sleepHook    = time.Sleep
+	playNoteHook                func(note, velocity int)
+	stopNoteHook                func(note int)
+	playConfirmationFanfareHook func()
+	sleepHook                   = time.Sleep
 )
 
 // SetPlayNoteFunc は、Goから曲を自動再生する際に使う「1音鳴らす」実装を
@@ -300,11 +303,19 @@ func SetStopNoteFunc(f func(note int)) {
 	audioHooksMu.Unlock()
 }
 
+// SetPlayConfirmationFanfareFunc は、時の歌・馬の歌の確認音(mp3の効果音)を
+// 再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayConfirmationFanfareFunc(f func()) {
+	audioHooksMu.Lock()
+	playConfirmationFanfareHook = f
+	audioHooksMu.Unlock()
+}
+
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律
 // パターンと照合する。扉のメロディ(DOOR_MELODY)または時の歌
 // (music.SongOfTimeName)が演奏された場合、doorOpenDelayだけ「ため」て
 // から隠し扉を開く。時の歌の場合は、その「ため」の間に確認音
-// (SongOfTimeConfirmation)→曲を最初から通した自動再生
+// (「テレレレレ」、mp3の効果音)→曲を最初から通した自動再生
 // (SongOfTimeOpening→SongOfTimeContinuation)も行う。馬の歌
 // (music.HorseSongName)が演奏された場合は、確認音→続き(HorseSongContinuation)
 // の再生に合わせて馬を呼び出す(SetHorseSummonerで登録された関数を呼ぶ)。
@@ -338,38 +349,50 @@ func onMelodyRecorded(melody music.Melody) {
 }
 
 // playSongOfTimeAudio は、プレイヤーが演奏した合図に続けて、確認音
-// (music.SongOfTimeConfirmation)を鳴らした後、本家のゼルダのように
-// 曲を最初から(music.SongOfTimeOpening→music.SongOfTimeContinuation)
-// 通して自動再生する。再生用フックが未登録(ネイティブビルドやJS未初期化時)
-// の場合は何もしない。
+// (「テレレレレ」、mp3の効果音)を鳴らした後、本家のゼルダのように曲を
+// 最初から(music.SongOfTimeOpening→music.SongOfTimeContinuation)通して
+// 自動再生する。再生用フックが未登録(ネイティブビルドやJS未初期化時)の
+// 場合は何もしない。
 func playSongOfTimeAudio() {
 	audioHooksMu.Lock()
-	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
+	play, stop, sleep, fanfare := playNoteHook, stopNoteHook, sleepHook, playConfirmationFanfareHook
 	audioHooksMu.Unlock()
 
 	if play == nil || stop == nil {
 		return
 	}
-	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
+	playConfirmationFanfare(fanfare, sleep)
 	sleep(music.SongOfTimePauseDur)
 	playNotes(play, stop, sleep, music.SongOfTimeOpening)
 	playNotes(play, stop, sleep, music.SongOfTimeContinuation)
 }
 
 // playHorseSongAudio は、プレイヤーが馬の歌の合図を演奏した後、確認音
-// (music.SongOfTimeConfirmationを共用)に続けてmusic.HorseSongContinuationを
-// 自動再生する。再生用フックが未登録の場合は何もしない。
+// (時の歌と共用)に続けてmusic.HorseSongContinuationを自動再生する。
+// 再生用フックが未登録の場合は何もしない。
 func playHorseSongAudio() {
 	audioHooksMu.Lock()
-	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
+	play, stop, sleep, fanfare := playNoteHook, stopNoteHook, sleepHook, playConfirmationFanfareHook
 	audioHooksMu.Unlock()
 
 	if play == nil || stop == nil {
 		return
 	}
-	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
+	playConfirmationFanfare(fanfare, sleep)
 	sleep(music.SongOfTimePauseDur)
 	playNotes(play, stop, sleep, music.HorseSongContinuation)
+}
+
+// playConfirmationFanfare は、時の歌・馬の歌を正しく演奏した際の確認音
+// (「テレレレレ」、mp3の効果音、web/assets/audio/song-of-time-confirmation.mp3)
+// を再生し、その再生時間(music.ConfirmationFanfareDuration)だけ待つ。
+// フックが未登録(ネイティブビルドやJS未初期化時)の場合は何もしない。
+func playConfirmationFanfare(fanfare func(), sleep func(time.Duration)) {
+	if fanfare == nil {
+		return
+	}
+	fanfare()
+	sleep(music.ConfirmationFanfareDuration)
 }
 
 // playNotes はnotesを順番に、1音ずつ鳴らして止めてを繰り返しながら再生する。

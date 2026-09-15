@@ -22,10 +22,12 @@ func Init() {
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection)")
 
-	// JS側(web/audio.jsのplayNote/stopNote)の実装をgameパッケージに差し込む。
-	// これにより、Goから「時の歌」の続きなどを自動再生できる。
+	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare)の実装を
+	// gameパッケージに差し込む。これにより、Goから「時の歌」の続きなどを
+	// 自動再生できる。
 	game.SetPlayNoteFunc(callPlayNote)
 	game.SetStopNoteFunc(callStopNote)
+	game.SetPlayConfirmationFanfareFunc(callPlayConfirmationFanfare)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -36,6 +38,13 @@ func callPlayNote(note, velocity int) {
 // callStopNote はGoからJavaScript側のstopNote(note)を呼び出す。
 func callStopNote(note int) {
 	js.Global().Call("stopNote", note)
+}
+
+// callPlayConfirmationFanfare はGoからJavaScript側の
+// playConfirmationFanfare()を呼び出し、時の歌・馬の歌の確認音
+// (「テレレレレ」、mp3の効果音)を再生する。
+func callPlayConfirmationFanfare() {
+	js.Global().Call("playConfirmationFanfare")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
