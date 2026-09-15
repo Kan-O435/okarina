@@ -141,7 +141,7 @@ func SetHorseSummoner(f func()) {
 // jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
 // 低い音を2回連続で出すジェスチャーでジャンプを発生させる
 // (馬に乗っている間に障害物を飛び越える、といった用途に使う)。
-const jumpPitchThresholdHz = 150.0
+const jumpPitchThresholdHz = 180.0
 
 // jumpGestureLow・jumpGestureCount は、「低い音を2回」ジェスチャーの検出
 // 状態。jumpGestureLowは直前の読み取りが低い音の最中だったかどうか
