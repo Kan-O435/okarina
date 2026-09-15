@@ -27,3 +27,6 @@ func (p *Program) SetUniformVec3(c *Context, name string, v vecmath.Vec3) {}
 
 // SetUniformSampler はネイティブビルドでは何もしない。
 func (p *Program) SetUniformSampler(c *Context, name string, textureUnit int) {}
+
+// SetUniformFloat はネイティブビルドでは何もしない。
+func (p *Program) SetUniformFloat(c *Context, name string, v float64) {}

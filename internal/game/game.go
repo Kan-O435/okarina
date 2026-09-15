@@ -170,20 +170,23 @@ func TriggerGanonHallCollapsePreview() {
 	}
 }
 
-// ganonBattleDefeatTrigger は、戦場跡でGanonの最終形態を倒した際の演出を
-// 開始する関数。cmd/ganon-battle/main.goが起動時に登録する
-// (ganonHallCollapseTriggerと同様のコールバックパターン)。実際の撃破
-// 演出はまだ無いため、登録されるまでは何も起きない。
+// ganonBattleDefeatTrigger は、戦場跡フィールドでGanonの最終形態を倒した際の
+// 演出(嵐→雷→爆発→白フェード→エンディングページへの遷移)を開始する関数。
+// cmd/ganon-battle/main.goが起動時に登録する(ganonHallCollapseTriggerと
+// 同様のコールバックパターン)。onMelodyRecordedが嵐の歌(music.
+// GanonBattleMelodyName)を認識した際に、確認音・BGMの再生後にこの
+// TriggerGanonBattleDefeat()を呼ぶ。
 var ganonBattleDefeatTrigger func()
 
-// SetGanonBattleDefeatTrigger は、戦場跡の撃破演出を開始する関数を登録する。
+// SetGanonBattleDefeatTrigger は、戦場跡フィールドのGanon最終形態撃破演出を
+// 開始する関数を登録する。
 func SetGanonBattleDefeatTrigger(f func()) {
 	ganonBattleDefeatTrigger = f
 }
 
-// TriggerGanonBattleDefeat は、登録済みの撃破演出開始関数を実行する。
-// 未登録の場合(演出がまだ無い、または戦場跡フィールド以外のページ)は
-// 何もしない。
+// TriggerGanonBattleDefeat はブリッジ(JavaScript側)から呼ばれ、登録済みの
+// Ganon最終形態撃破演出開始関数を実行する。未登録の場合(戦場跡フィールド
+// 以外のページ)は何もしない。
 func TriggerGanonBattleDefeat() {
 	if ganonBattleDefeatTrigger != nil {
 		ganonBattleDefeatTrigger()
@@ -385,9 +388,10 @@ var audioHooksMu sync.Mutex
 // 効果音(web/ganon-hall.jsのplayGanonHallCollapseSound)を再生するための
 // フック。playGanonBattleSongHookは、嵐の歌を正しく演奏した後に流す本家の
 // BGM(web/ganon-battle.jsのplayGanonBattleSongOfStorms)を再生するための
-// フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未
-// 初期化時はnilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち
-// 時間を省略する)。
+// フック。playGanonBattleThunderHookは、Ganon最終形態撃破演出中の雷鳴
+// (web/ganon-battle.jsで合成)を再生するためのフック。bridge.Init()がJS
+// 側の実装を差し込む。ネイティブビルドやJS未初期化時はnilのまま。
+// sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
 var (
 	playNoteHook                   func(note, velocity int)
 	stopNoteHook                   func(note int)
@@ -395,6 +399,7 @@ var (
 	playHorseJumpSoundHook         func()
 	playGanonHallCollapseSoundHook func()
 	playGanonBattleSongHook        func()
+	playGanonBattleThunderHook     func()
 	sleepHook                      = time.Sleep
 )
 
@@ -471,6 +476,29 @@ func SetPlayGanonBattleSongFunc(f func()) {
 	audioHooksMu.Lock()
 	playGanonBattleSongHook = f
 	audioHooksMu.Unlock()
+}
+
+// SetPlayGanonBattleThunderSoundFunc は、戦場跡フィールドのGanon最終形態
+// 撃破演出で雷が落ちた瞬間の雷鳴を再生する実装を登録する(bridge.Init()
+// から呼ばれる)。
+func SetPlayGanonBattleThunderSoundFunc(f func()) {
+	audioHooksMu.Lock()
+	playGanonBattleThunderHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayGanonBattleThunderSound は、Ganon最終形態撃破演出で雷が落ちた瞬間の
+// 雷鳴(mp3等の音声ファイルではなく、web/ganon-battle.js側でWeb Audio
+// APIによりその場で合成するノイズ音)を再生する。cmd/ganon-battle/main.goが、
+// 雷の閃光が出た瞬間に呼ぶ想定。フックが未登録(ネイティブビルドやJS未
+// 初期化時)の場合は何もしない。
+func PlayGanonBattleThunderSound() {
+	audioHooksMu.Lock()
+	play := playGanonBattleThunderHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
 }
 
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律

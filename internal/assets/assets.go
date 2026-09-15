@@ -197,3 +197,32 @@ var GanonHallMelodySheetTexture []byte
 //
 //go:embed textures/ganon-battle-melody-sheet.png
 var GanonBattleMelodySheetTexture []byte
+
+// GanonLightning は、ganon-battleフィールド(戦場跡案)でGanonの最終形態を
+// 倒すカットシーンの雷に使うGLB(Sketchfab「3 Pack of Storm Lightning」、
+// 作者: Incg5764、CC Attribution、
+// https://sketchfab.com/3d-models/3-pack-of-storm-lightning-8acf90c132754b6bb9ab2b60ebd9465f)。
+// 分岐した雷のメッシュが3種類まとまっており、そのうち縦長で1本に近い
+// 見た目のものを1つ選んでGanonの頭上に落とす
+// (internal/renderer/ganon.goのGanonBattleLightningObject参照)。スキンは
+// 無くパーツごとに別メッシュへ分かれているため、TempleCloud等と同じ
+// gltf.ParseParts経由で読み込む。詳細は
+// docs/licenses/sketchfab-incg5764-stormlightning-CC-BY.txt参照。
+//
+//go:embed models/ganon-lightning.glb
+var GanonLightning []byte
+
+// GanonStormCloud は、ganon-battleフィールドでGanonの最終形態を倒す
+// カットシーンの冒頭、アリーナ上空に集まる嵐雲のGLB(Sketchfab「Low Poly
+// Cloud 3D Model Game Asset UI Element」、作者: B1Blender、CC Attribution、
+// https://sketchfab.com/3d-models/low-poly-cloud-3d-model-game-asset-ui-element-16eb4c30016a4a4dafd70f2daf75c501)。
+// 元は明るい水色だが、暗い青灰色に着色して不穏な嵐の雲として使う
+// (internal/renderer/ganon.goのGanonBattleStormCloudObjects参照。
+// 神殿・草原の雲(TempleCloud)とは別モデル)。7種類のフラットカラーの
+// 雲メッシュがまとまっており、いくつかを選んで手動配置する。スキンは
+// 無くパーツごとに別メッシュへ分かれているため、TempleCloud等と同じ
+// gltf.ParseParts経由で読み込む。詳細は
+// docs/licenses/sketchfab-b1blender-lowpolycloud-CC-BY.txt参照。
+//
+//go:embed models/storm-cloud.glb
+var GanonStormCloud []byte
