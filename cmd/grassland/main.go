@@ -63,11 +63,34 @@ func main() {
 					player.Player.SpeedMultiplier = horseSpeedMultiplier
 				})
 
+				// 馬に乗っている間、低い音を2回連続で鳴らすとジャンプする
+				// (道の途中の柵を飛び越えるために使う)。馬に乗っていなければ
+				// 無視する。
+				game.SetJumpTrigger(func() {
+					if horseIndex < 0 {
+						return
+					}
+					player.Player.StartJump()
+				})
+
 				mountOffset := vecmath.Translate(vecmath.NewVec3(0, renderer.LinkMountHeight, 0))
 
 				ctx.RunLoop(func(dt float64) {
+					prevZ := player.Player.Z
 					deltaZ := player.Player.Update(dt)
+
+					// 道の途中の柵は、ジャンプ中でなければ通り抜けられない。
+					// 横切ろうとしていたら、その手前で止める。
 					if deltaZ != 0 {
+						if blockedZ, blocked := renderer.GrasslandObstacleBlocks(prevZ, player.Player.Z, player.Player.IsJumping()); blocked {
+							player.Player.Z = blockedZ
+						}
+					}
+
+					// ジャンプ中は、前後に動いていなくても(deltaZ==0でも)
+					// 見た目のY方向オフセットが変わり続けるため、その間は
+					// 毎フレームTransformを更新する。
+					if deltaZ != 0 || player.Player.IsJumping() {
 						linkTransform := player.Player.Transform(link.LocalTransform)
 						if horseIndex >= 0 {
 							// 馬に乗っている間は、Linkを持ち上げて背に

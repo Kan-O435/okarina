@@ -138,6 +138,53 @@ func SetHorseSummoner(f func()) {
 	horseSummoner = f
 }
 
+// jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
+// 低い音を2回連続で出すジェスチャーでジャンプを発生させる
+// (馬に乗っている間に障害物を飛び越える、といった用途に使う)。
+const jumpPitchThresholdHz = 150.0
+
+// jumpGestureLow・jumpGestureCount は、「低い音を2回」ジェスチャーの検出
+// 状態。jumpGestureLowは直前の読み取りが低い音の最中だったかどうか
+// (無音や高い音を挟まずに同じ低い音を鳴らし続けている間は2回とカウント
+// しない)、jumpGestureCountは低い音の立ち上がりを検出した回数。
+var (
+	jumpGestureLow   bool
+	jumpGestureCount int
+)
+
+// jumpTrigger は、「低い音を2回」のジェスチャーが成立した際に呼ばれる
+// 関数。cmd/grassland/main.goが起動時に登録する(horseSummonerと同様の
+// コールバックパターン)。馬に乗っていない場合は登録側で無視する想定。
+var jumpTrigger func()
+
+// SetJumpTrigger は、ジャンプジェスチャーが成立した際に呼び出す関数を
+// 登録する。
+func SetJumpTrigger(f func()) {
+	jumpTrigger = f
+}
+
+// updateJumpGesture は、最新のピッチ(Hz)から「低い音を2回」ジェスチャーの
+// 検出状態を進める。低い音の立ち上がり(無音・高い音から低い音に変わった
+// 瞬間)を1回とカウントし、2回連続で検出したらjumpTriggerを呼ぶ。
+// 明確に高い音(低い音ではない、かつ無音でもない)が鳴ったら、それまでの
+// カウントはリセットする(ジェスチャーの途中で別の演奏に移ったとみなす)。
+func updateJumpGesture(freq float64) {
+	isLow := freq > 0 && freq < jumpPitchThresholdHz
+	switch {
+	case isLow && !jumpGestureLow:
+		jumpGestureCount++
+		if jumpGestureCount >= 2 {
+			jumpGestureCount = 0
+			if jumpTrigger != nil {
+				jumpTrigger()
+			}
+		}
+	case freq > 0 && !isLow:
+		jumpGestureCount = 0
+	}
+	jumpGestureLow = isLow
+}
+
 // OpenDoor はブリッジ(JavaScript側)から呼ばれ、登録済みのGameインスタンスの
 // 扉を開く。インスタンスが未登録の場合は何もしない。
 func OpenDoor() {
@@ -150,8 +197,11 @@ func OpenDoor() {
 // 移動方向判定に渡す。ピッチが検出できなかった場合はfreqに0以下を渡す。
 // 実際のプレイヤー移動は、Go側で常時回っているゲームループ
 // (Context.RunLoop、cmd/game/main.go参照)がGame.Update()経由で進める。
+// あわせて、「低い音を2回」のジャンプジェスチャーの検出も進める
+// (updateJumpGesture参照)。
 func OnPitchDetected(freq float64) {
 	player.Player.OnPitch(freq)
+	updateJumpGesture(freq)
 }
 
 // PlayerDirection は現在のプレイヤーの移動方向を文字列で返す
