@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Kan-O435/okarina/internal/midi"
 	"github.com/Kan-O435/okarina/internal/music"
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
@@ -286,5 +287,43 @@ func TestOnPitchDetected_HighNoteDoesNotTriggerJump(t *testing.T) {
 	OnPitchDetected(440) // 明確に高い音 → 発火しない
 	if triggered != 0 {
 		t.Fatalf("expected a high note not to trigger a jump, got %d triggers", triggered)
+	}
+}
+
+func TestOnMIDIEvent_NoteCTriggersTitleStart(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	OnMIDIEvent(midi.Event{Note: 60, Velocity: 100, IsNoteOn: true}) // C4
+	if triggered != 1 {
+		t.Fatalf("expected exactly one trigger for a C Note On, got %d", triggered)
+	}
+
+	OnMIDIEvent(midi.Event{Note: 72, Velocity: 100, IsNoteOn: true}) // C5(オクターブ違い)
+	if triggered != 2 {
+		t.Fatalf("expected the trigger to fire regardless of octave, got %d", triggered)
+	}
+}
+
+func TestOnMIDIEvent_NonCNoteDoesNotTriggerTitleStart(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	OnMIDIEvent(midi.Event{Note: 62, Velocity: 100, IsNoteOn: true}) // D4
+	if triggered != 0 {
+		t.Fatalf("expected no trigger for a non-C note, got %d", triggered)
+	}
+}
+
+func TestOnMIDIEvent_NoteOffDoesNotTriggerTitleStart(t *testing.T) {
+	triggered := 0
+	SetTitleStartTrigger(func() { triggered++ })
+	defer SetTitleStartTrigger(nil)
+
+	OnMIDIEvent(midi.Event{Note: 60, Velocity: 0, IsNoteOn: false}) // C4 Note Off
+	if triggered != 0 {
+		t.Fatalf("expected no trigger for a Note Off, got %d", triggered)
 	}
 }
