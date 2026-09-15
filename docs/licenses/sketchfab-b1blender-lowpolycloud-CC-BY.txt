@@ -1,0 +1,24 @@
+Low Poly Cloud 3D Model Game Asset UI Element
+
+Author: B1Blender (https://sketchfab.com/B1Blender)
+Source: https://sketchfab.com/3d-models/low-poly-cloud-3d-model-game-asset-ui-element-16eb4c30016a4a4dafd70f2daf75c501
+
+License: Creative Commons Attribution (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution:
+"Low Poly Cloud 3D Model Game Asset UI Element" by B1Blender is licensed
+under Creative Commons Attribution.
+
+---
+
+Used as internal/assets/models/storm-cloud.glb (internal/assets.GanonStormCloud),
+the dark storm clouds that gather above the arena at the start of the
+ganon-battle field's final-form defeat cutscene (cmd/ganon-battle,
+internal/renderer/ganon.go's GanonBattleStormCloudObjects). Tinted a dark
+blue-grey (unlike its original bright blue look) to read as an ominous
+storm rather than a fair-weather sky.
+
+7 simple flat-color low-poly cloud meshes in one GLB (no embedded texture),
+loaded with gltf.ParseParts like the Ganon boss assets; a handful of the 7
+are picked and placed by hand above the arena.

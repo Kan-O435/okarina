@@ -26,17 +26,20 @@ func Init() {
 	js.Global().Set("goDebugTriggerTitleStart", js.FuncOf(goDebugTriggerTitleStart))
 	js.Global().Set("goDebugTriggerJump", js.FuncOf(goDebugTriggerJump))
 	js.Global().Set("goDebugTriggerGanonHallMelody", js.FuncOf(goDebugTriggerGanonHallMelody))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody)")
+	js.Global().Set("goDefeatGanonFinalForm", js.FuncOf(goDefeatGanonFinalForm))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody, goDefeatGanonFinalForm)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
-	// playGanonHallCollapseSound)の実装をgameパッケージに差し込む。
+	// playGanonHallCollapseSound、web/ganon-battle.jsの
+	// playGanonBattleThunderSound)の実装をgameパッケージに差し込む。
 	// これにより、Goから「時の歌」の続きや効果音などを自動再生できる。
 	game.SetPlayNoteFunc(callPlayNote)
 	game.SetStopNoteFunc(callStopNote)
 	game.SetPlayConfirmationFanfareFunc(callPlayConfirmationFanfare)
 	game.SetPlayHorseJumpSoundFunc(callPlayHorseJumpSound)
 	game.SetPlayGanonHallCollapseSoundFunc(callPlayGanonHallCollapseSound)
+	game.SetPlayGanonBattleThunderSoundFunc(callPlayGanonBattleThunderSound)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -68,6 +71,14 @@ func callPlayHorseJumpSound() {
 // 際の効果音を再生する(web/ganon-hall.js、玉座の間のみで定義される)。
 func callPlayGanonHallCollapseSound() {
 	js.Global().Call("playGanonHallCollapseSound")
+}
+
+// callPlayGanonBattleThunderSound はGoからJavaScript側の
+// playGanonBattleThunderSound()を呼び出し、戦場跡フィールドのGanon最終
+// 形態撃破演出で雷が落ちた瞬間の雷鳴を再生する(web/ganon-battle.js、
+// 戦場跡フィールドのみで定義される)。
+func callPlayGanonBattleThunderSound() {
+	js.Global().Call("playGanonBattleThunderSound")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
@@ -196,5 +207,17 @@ func goDebugTriggerJump(this js.Value, args []js.Value) interface{} {
 func goDebugTriggerGanonHallMelody(this js.Value, args []js.Value) interface{} {
 	game.DebugTriggerGanonHallMelody()
 	CallConsoleLog("bridge: goDebugTriggerGanonHallMelody() called (debug key)")
+	return nil
+}
+
+// goDefeatGanonFinalForm はJavaScript側(戦場跡フィールドのデバッグボタン)
+// から呼び出され、Ganonの最終形態を倒した演出(嵐→雷→爆発→白フェード→
+// エンディングページへの遷移)を開始する。「特定の演奏で倒す」処理は
+// 別途メロディが実装され次第onMelodyRecorded側から配線される想定で、
+// 現時点では動作確認用のボタンから直接呼ぶ
+// (goDefeatGanonFirstFormと同様の仮実装パターン)。
+func goDefeatGanonFinalForm(this js.Value, args []js.Value) interface{} {
+	game.TriggerGanonBattleDefeat()
+	CallConsoleLog("bridge: goDefeatGanonFinalForm() called, starting ganon battle defeat cutscene")
 	return nil
 }

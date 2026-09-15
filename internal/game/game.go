@@ -170,6 +170,30 @@ func TriggerGanonHallCollapsePreview() {
 	}
 }
 
+// ganonBattleDefeatTrigger は、戦場跡フィールドでGanonの最終形態を倒した際の
+// 演出(嵐→雷→爆発→白フェード→エンディングページへの遷移)を開始する関数。
+// cmd/ganon-battle/main.goが起動時に登録する(ganonHallCollapseTriggerと
+// 同様のコールバックパターン)。「特定の演奏で倒す」メロディ判定はまだ
+// 無いため、現時点ではデバッグボタン(bridge.goのgoDefeatGanonFinalForm)
+// から直接呼ばれる想定。メロディが実装された際は、onMelodyRecorded側から
+// このTriggerGanonBattleDefeat()を呼ぶだけで配線できる。
+var ganonBattleDefeatTrigger func()
+
+// SetGanonBattleDefeatTrigger は、戦場跡フィールドのGanon最終形態撃破演出を
+// 開始する関数を登録する。
+func SetGanonBattleDefeatTrigger(f func()) {
+	ganonBattleDefeatTrigger = f
+}
+
+// TriggerGanonBattleDefeat はブリッジ(JavaScript側)から呼ばれ、登録済みの
+// Ganon最終形態撃破演出開始関数を実行する。未登録の場合(戦場跡フィールド
+// 以外のページ)は何もしない。
+func TriggerGanonBattleDefeat() {
+	if ganonBattleDefeatTrigger != nil {
+		ganonBattleDefeatTrigger()
+	}
+}
+
 // jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
 // 低い音を1回鳴らすだけでジャンプを発生させる(馬に乗っている間に
 // 障害物を飛び越える、といった用途に使う)。以前は「低い音を2回」の
@@ -362,6 +386,7 @@ var (
 	playConfirmationFanfareHook    func()
 	playHorseJumpSoundHook         func()
 	playGanonHallCollapseSoundHook func()
+	playGanonBattleThunderHook     func()
 	sleepHook                      = time.Sleep
 )
 
@@ -426,6 +451,29 @@ func SetPlayGanonHallCollapseSoundFunc(f func()) {
 func PlayGanonHallCollapseSound() {
 	audioHooksMu.Lock()
 	play := playGanonHallCollapseSoundHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
+}
+
+// SetPlayGanonBattleThunderSoundFunc は、戦場跡フィールドのGanon最終形態
+// 撃破演出で雷が落ちた瞬間の雷鳴を再生する実装を登録する(bridge.Init()
+// から呼ばれる)。
+func SetPlayGanonBattleThunderSoundFunc(f func()) {
+	audioHooksMu.Lock()
+	playGanonBattleThunderHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayGanonBattleThunderSound は、Ganon最終形態撃破演出で雷が落ちた瞬間の
+// 雷鳴(mp3等の音声ファイルではなく、web/ganon-battle.js側でWeb Audio
+// APIによりその場で合成するノイズ音)を再生する。cmd/ganon-battle/main.goが、
+// 雷の閃光が出た瞬間に呼ぶ想定。フックが未登録(ネイティブビルドやJS未
+// 初期化時)の場合は何もしない。
+func PlayGanonBattleThunderSound() {
+	audioHooksMu.Lock()
+	play := playGanonBattleThunderHook
 	audioHooksMu.Unlock()
 	if play != nil {
 		play()
