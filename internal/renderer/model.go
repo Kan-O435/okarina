@@ -36,3 +36,36 @@ func (m *Model) GroundTransform(x, z, targetHeight float64) vecmath.Mat4 {
 
 	return toWorld.Mul(scaleMat).Mul(toOrigin)
 }
+
+// CombinedGroundTransform はGroundTransformと同じ考え方だが、複数の
+// Model(Tripo3Dのセグメンテーション機能でパーツ分割されたGLBの各パーツ)を
+// 1つのバウンディングボックスとして扱い、全パーツに共通の変換行列を返す。
+// パーツごとに別々のGroundTransformを使うと、パーツ間の相対位置が
+// (それぞれのバウンディングボックス中心を基準に)ズレてしまうため、
+// 全パーツをまとめた地面配置にはこちらを使う。
+func CombinedGroundTransform(models []*Model, x, z, targetHeight float64) vecmath.Mat4 {
+	if len(models) == 0 {
+		return vecmath.Identity()
+	}
+	min, max := models[0].Min, models[0].Max
+	for _, m := range models[1:] {
+		min = vecmath.NewVec3(minF(min.X, m.Min.X), minF(min.Y, m.Min.Y), minF(min.Z, m.Min.Z))
+		max = vecmath.NewVec3(maxF(max.X, m.Max.X), maxF(max.Y, m.Max.Y), maxF(max.Z, m.Max.Z))
+	}
+	combined := &Model{Min: min, Max: max}
+	return combined.GroundTransform(x, z, targetHeight)
+}
+
+func minF(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxF(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}

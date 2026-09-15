@@ -4,7 +4,10 @@
 // 現時点では以下に対応範囲を絞っている(スコープ外は今後拡張する):
 //   - Parse()は最初のメッシュの最初のプリミティブのみを読む。ParseSkinned()は
 //     スキン付きノードが参照する全プリミティブを1つに結合する(体パーツ分割
-//     モデル向け)
+//     モデル向け)。ParseParts()は全メッシュをパーツごとに別々のPrimitiveとして
+//     返す(Tripo3Dのセグメンテーション機能でパーツ分割したモデル向け。
+//     パーツごとにマテリアル/テクスチャが別々なため、ParseSkinnedのように
+//     1つに結合できない)
 //   - POSITION/TEXCOORD_0/インデックスに対応。NORMALはまだ読まない(陰影無し)
 //   - マテリアルはbaseColorFactorとbaseColorTexture(GLBに埋め込まれた
 //     JPEG/PNG)のみ読む。他のテクスチャ(法線・金属度等)は非対応
@@ -128,26 +131,68 @@ type pbrMetallicRoughness struct {
 
 // Parse はGLBバイナリをパースし、最初のメッシュの最初のプリミティブを返す。
 func Parse(data []byte) (*Primitive, error) {
-	jsonChunk, binChunk, err := splitGLBChunks(data)
+	doc, binChunk, err := parseDocument(data)
 	if err != nil {
 		return nil, err
-	}
-
-	var doc document
-	if err := json.Unmarshal(jsonChunk, &doc); err != nil {
-		return nil, fmt.Errorf("gltf: failed to parse JSON chunk: %w", err)
 	}
 
 	if len(doc.Meshes) == 0 || len(doc.Meshes[0].Primitives) == 0 {
 		return nil, errors.New("gltf: no mesh primitives found")
 	}
-	prim := doc.Meshes[0].Primitives[0]
+	return readPrimitive(doc, binChunk, doc.Meshes[0].Primitives[0])
+}
 
+// ParseParts はGLBバイナリをパースし、全メッシュ(1メッシュにつき最初の
+// プリミティブのみ)をそれぞれ独立したPrimitiveとして返す。Tripo3Dの
+// セグメンテーション機能でパーツ分割したモデルは、パーツごとに別メッシュ・
+// 別マテリアル(別テクスチャ)を持つため、ParseSkinnedのように1つの
+// Primitiveへ結合できない。呼び出し側でパーツごとに別Objectとして描画する。
+func ParseParts(data []byte) ([]Primitive, error) {
+	doc, binChunk, err := parseDocument(data)
+	if err != nil {
+		return nil, err
+	}
+	if len(doc.Meshes) == 0 {
+		return nil, errors.New("gltf: no meshes found")
+	}
+
+	prims := make([]Primitive, 0, len(doc.Meshes))
+	for _, mesh := range doc.Meshes {
+		if len(mesh.Primitives) == 0 {
+			continue
+		}
+		prim, err := readPrimitive(doc, binChunk, mesh.Primitives[0])
+		if err != nil {
+			return nil, err
+		}
+		prims = append(prims, *prim)
+	}
+	return prims, nil
+}
+
+// parseDocument はGLBバイナリからJSONチャンクをパースし、以降の読み取りに
+// 必要なdocumentとバイナリチャンクを返す。
+func parseDocument(data []byte) (*document, []byte, error) {
+	jsonChunk, binChunk, err := splitGLBChunks(data)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var doc document
+	if err := json.Unmarshal(jsonChunk, &doc); err != nil {
+		return nil, nil, fmt.Errorf("gltf: failed to parse JSON chunk: %w", err)
+	}
+	return &doc, binChunk, nil
+}
+
+// readPrimitive は1つのプリミティブからPOSITION/インデックス/UV/マテリアルを
+// 読み取り、Primitiveにまとめる。
+func readPrimitive(doc *document, binChunk []byte, prim primitive) (*Primitive, error) {
 	positionIdx, ok := prim.positionAccessor()
 	if !ok {
 		return nil, errors.New("gltf: primitive has no POSITION attribute")
 	}
-	positions, err := readFloat32Accessor(&doc, binChunk, positionIdx)
+	positions, err := readFloat32Accessor(doc, binChunk, positionIdx)
 	if err != nil {
 		return nil, err
 	}
@@ -155,17 +200,17 @@ func Parse(data []byte) (*Primitive, error) {
 	if prim.Indices == nil {
 		return nil, errors.New("gltf: unindexed primitives are not supported yet")
 	}
-	indices, err := readIndexAccessor(&doc, binChunk, *prim.Indices)
+	indices, err := readIndexAccessor(doc, binChunk, *prim.Indices)
 	if err != nil {
 		return nil, err
 	}
 
-	texCoords, err := readTexCoordsOrZero(&doc, binChunk, prim, len(positions)/3)
+	texCoords, err := readTexCoordsOrZero(doc, binChunk, prim, len(positions)/3)
 	if err != nil {
 		return nil, err
 	}
 
-	mat, err := resolveMaterial(&doc, binChunk, prim.Material)
+	mat, err := resolveMaterial(doc, binChunk, prim.Material)
 	if err != nil {
 		return nil, err
 	}
@@ -194,14 +239,9 @@ func Parse(data []byte) (*Primitive, error) {
 // 時の姿勢(バインドポーズ)のまま静止表示になる。武器・盾・兜などスキンの
 // 割り当てがない装備品ノードは対象外とし、本体パーツのみを結合する。
 func ParseSkinned(data []byte) (*Primitive, error) {
-	jsonChunk, binChunk, err := splitGLBChunks(data)
+	doc, binChunk, err := parseDocument(data)
 	if err != nil {
 		return nil, err
-	}
-
-	var doc document
-	if err := json.Unmarshal(jsonChunk, &doc); err != nil {
-		return nil, fmt.Errorf("gltf: failed to parse JSON chunk: %w", err)
 	}
 
 	var meshIndices []int
@@ -224,46 +264,29 @@ func ParseSkinned(data []byte) (*Primitive, error) {
 			return nil, fmt.Errorf("gltf: mesh index %d out of range", meshIdx)
 		}
 		for _, prim := range doc.Meshes[meshIdx].Primitives {
-			positionIdx, ok := prim.positionAccessor()
-			if !ok {
-				return nil, errors.New("gltf: primitive has no POSITION attribute")
-			}
-			pos, err := readFloat32Accessor(&doc, binChunk, positionIdx)
-			if err != nil {
-				return nil, err
-			}
-
-			if prim.Indices == nil {
-				return nil, errors.New("gltf: unindexed primitives are not supported yet")
-			}
-			idx, err := readIndexAccessor(&doc, binChunk, *prim.Indices)
-			if err != nil {
-				return nil, err
-			}
-
-			uv, err := readTexCoordsOrZero(&doc, binChunk, prim, len(pos)/3)
+			part, err := readPrimitive(doc, binChunk, prim)
 			if err != nil {
 				return nil, err
 			}
 
 			vertexOffset := len(positions) / 3
-			if vertexOffset+len(pos)/3 > 0xFFFF {
+			if vertexOffset+len(part.Positions)/3 > 0xFFFF {
 				return nil, errors.New("gltf: combined mesh has more than 65535 vertices, not supported yet")
 			}
-			for _, v := range idx {
+			for _, v := range part.Indices {
 				indices = append(indices, v+uint16(vertexOffset))
 			}
-			positions = append(positions, pos...)
-			texCoords = append(texCoords, uv...)
+			positions = append(positions, part.Positions...)
+			texCoords = append(texCoords, part.TexCoords...)
 
 			// 体パーツごとにマテリアルが分かれている場合、最初に見つかったものを
 			// 代表として使う(テクスチャアトラスが共有されている想定)。
 			if !haveMaterial && prim.Material != nil {
-				info, err := resolveMaterial(&doc, binChunk, prim.Material)
-				if err != nil {
-					return nil, err
+				mat = materialInfo{
+					baseColor:       part.BaseColor,
+					textureData:     part.TextureData,
+					textureMimeType: part.TextureMimeType,
 				}
-				mat = info
 				haveMaterial = true
 			}
 		}

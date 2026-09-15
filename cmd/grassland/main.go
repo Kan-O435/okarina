@@ -34,6 +34,7 @@ func main() {
 				fmt.Println("renderer: failed to build grassland scene:", err)
 			} else {
 				player.Player.Z = link.SpawnZ
+				transitioned := false
 
 				ctx.RunLoop(func(dt float64) {
 					deltaZ := player.Player.Update(dt)
@@ -41,6 +42,13 @@ func main() {
 						scene.Objects[link.Index].Transform = player.Player.Transform(link.LocalTransform)
 					}
 					scene.Render(ctx)
+
+					// Linkが右奥の木のあたりまで進んだら、次のフィールド
+					// (ガノン)へページ遷移する。
+					if !transitioned && player.Player.Z <= renderer.GrasslandTreeTriggerZ {
+						transitioned = true
+						ctx.Navigate("ganon.html")
+					}
 				})
 				fmt.Println("renderer: grassland scene rendered, game loop started")
 			}
