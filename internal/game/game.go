@@ -278,21 +278,24 @@ func HorseSongPlayed() bool {
 }
 
 // audioHooksMu は、下のplayNoteHook・stopNoteHook・playConfirmationFanfareHook・
-// sleepHookへの読み書きを保護する。onMelodyRecordedはgoroutineを起動して
-// 非同期に曲の続きを再生するため、bridge.Init()での差し込みやテストでの
-// 差し替えと同時に読まれても安全なようにしている。
+// playHorseJumpSoundHook・sleepHookへの読み書きを保護する。onMelodyRecorded
+// はgoroutineを起動して非同期に曲の続きを再生するため、bridge.Init()での
+// 差し込みやテストでの差し替えと同時に読まれても安全なようにしている。
 var audioHooksMu sync.Mutex
 
 // playNoteHook・stopNoteHook は、Goから直接ブラウザの音声再生(Web Audio
 // API、web/audio.jsのplayNote/stopNote)を呼び出すためのフック。
 // playConfirmationFanfareHookは、確認音(「テレレレレ」、mp3の効果音、
 // web/audio.jsのplayConfirmationFanfare)を再生するためのフック。
+// playHorseJumpSoundHookは、馬がジャンプした際のいななき効果音
+// (web/grassland.jsのplayHorseJumpSound)を再生するためのフック。
 // bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未初期化時は
 // nilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
 var (
 	playNoteHook                func(note, velocity int)
 	stopNoteHook                func(note int)
 	playConfirmationFanfareHook func()
+	playHorseJumpSoundHook      func()
 	sleepHook                   = time.Sleep
 )
 
@@ -318,6 +321,28 @@ func SetPlayConfirmationFanfareFunc(f func()) {
 	audioHooksMu.Lock()
 	playConfirmationFanfareHook = f
 	audioHooksMu.Unlock()
+}
+
+// SetPlayHorseJumpSoundFunc は、馬がジャンプした際のいななき効果音を
+// 再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayHorseJumpSoundFunc(f func()) {
+	audioHooksMu.Lock()
+	playHorseJumpSoundHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayHorseJumpSound は、馬がジャンプした際のいななき効果音(mp3、
+// web/assets/audio/horse-jump-neigh.mp3)を再生する。cmd/grassland/
+// main.goが、ジャンプジェスチャー成立時(SetJumpTriggerのコールバック内)
+// から呼ぶ想定。フックが未登録(ネイティブビルドやJS未初期化時)の場合は
+// 何もしない。
+func PlayHorseJumpSound() {
+	audioHooksMu.Lock()
+	play := playHorseJumpSoundHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
 }
 
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律

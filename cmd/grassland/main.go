@@ -84,14 +84,17 @@ func main() {
 					player.Player.SpeedMultiplier = horseSpeedMultiplier
 				})
 
-				// 馬に乗っている間、低い音を2回連続で鳴らすとジャンプする
-				// (道の途中の柵を飛び越えるために使う)。馬に乗っていなければ
-				// 無視する。
+				// 馬に乗っている間、低い音を鳴らすとジャンプする(道の途中の
+				// 柵を飛び越えるために使う)。馬に乗っていなければ無視する。
+				// ジャンプの瞬間に馬のいななき効果音を鳴らす(無遅延で
+				// 再生できるよう、web/grassland.jsで事前にデコードした
+				// AudioBufferを使う。game.PlayHorseJumpSound参照)。
 				game.SetJumpTrigger(func() {
 					if horseIndex < 0 {
 						return
 					}
 					player.Player.StartJump()
+					game.PlayHorseJumpSound()
 				})
 
 				mountOffset := vecmath.Translate(vecmath.NewVec3(0, renderer.LinkMountHeight, 0))

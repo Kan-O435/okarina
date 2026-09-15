@@ -23,12 +23,14 @@ func Init() {
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
 	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm)")
 
-	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare)の実装を
-	// gameパッケージに差し込む。これにより、Goから「時の歌」の続きなどを
+	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
+	// web/grassland.jsのplayHorseJumpSound)の実装をgameパッケージに
+	// 差し込む。これにより、Goから「時の歌」の続きや効果音などを
 	// 自動再生できる。
 	game.SetPlayNoteFunc(callPlayNote)
 	game.SetStopNoteFunc(callStopNote)
 	game.SetPlayConfirmationFanfareFunc(callPlayConfirmationFanfare)
+	game.SetPlayHorseJumpSoundFunc(callPlayHorseJumpSound)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -46,6 +48,13 @@ func callStopNote(note int) {
 // (「テレレレレ」、mp3の効果音)を再生する。
 func callPlayConfirmationFanfare() {
 	js.Global().Call("playConfirmationFanfare")
+}
+
+// callPlayHorseJumpSound はGoからJavaScript側のplayHorseJumpSound()を
+// 呼び出し、馬がジャンプした際のいななき効果音を再生する
+// (web/grassland.js、草原フィールドのみで定義される)。
+func callPlayHorseJumpSound() {
+	js.Global().Call("playHorseJumpSound")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
