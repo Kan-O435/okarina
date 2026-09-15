@@ -39,9 +39,17 @@ func main() {
 				})
 				game.SetInstance(g)
 
+				songHUD, err := renderer.BuildSongSheetHUD(ctx, width, height)
+				if err != nil {
+					fmt.Println("renderer: failed to build song sheet HUD:", err)
+				}
+
 				ctx.RunLoop(func(dt float64) {
 					g.Update(dt)
 					scene.Render(ctx)
+					if songHUD != nil && game.IsNearDoor() {
+						songHUD.Render(ctx, width, height)
+					}
 				})
 				fmt.Println("renderer: demo scene rendered, game loop started")
 			}

@@ -13,6 +13,10 @@ type Pattern struct {
 // SongOfTimeContinuation(曲の後半部分)が自動再生される。
 const SongOfTimeName = "SONG_OF_TIME"
 
+// HorseSongName は「馬の歌」のPattern名。草原フィールドでプレイヤーが
+// この合図(レ→シ→ラ→レ→シ→ラ)を演奏すると馬が呼び出される。
+const HorseSongName = "HORSE_SONG"
+
 // DefaultPatterns はゲームで使用する魔法の旋律の定義一覧(MVP)。
 var DefaultPatterns = []Pattern{
 	{Name: "SUN_MELODY", Pitches: []Pitch{C, D, E, G}},
@@ -20,6 +24,8 @@ var DefaultPatterns = []Pattern{
 	{Name: "DOOR_MELODY", Pitches: []Pitch{C, G, C}},
 	// 時の歌(前半・演奏で認識させる合図): ラ→レ→ファ→ラ→レ→ファ
 	{Name: SongOfTimeName, Pitches: []Pitch{A, D, F, A, D, F}},
+	// 馬の歌(演奏で認識させる合図): レ→シ→ラ→レ→シ→ラ
+	{Name: HorseSongName, Pitches: []Pitch{D, B, A, D, B, A}},
 }
 
 // ContinuationNote は、自動再生する曲の1音を表す。演奏判定に使うPitch
@@ -32,11 +38,13 @@ type ContinuationNote struct {
 
 const (
 	continuationNormalDur = 350 * time.Millisecond
-	continuationLongDur   = 700 * time.Millisecond // 「ー」で伸ばす音
-	confirmationNoteDur   = 120 * time.Millisecond // 「テレレレレ」の確認音は短く刻む
+	continuationLongDur   = 700 * time.Millisecond    // 「ー」1個で伸ばす音(2拍分)
+	continuationLongDur2  = 3 * continuationNormalDur // 「ーー」2個で伸ばす音(3拍分)
+	continuationLongDur3  = 4 * continuationNormalDur // 「ーーー」3個で伸ばす音(4拍分)
+	confirmationNoteDur   = 120 * time.Millisecond    // 「テレレレレ」の確認音は短く刻む
 
 	// SongOfTimePauseDur は、確認音(SongOfTimeConfirmation)が鳴り終わって
-	// から曲の続き(SongOfTimeContinuation)が始まるまでの間(1拍分)。
+	// から曲の続き(SongOfTimeContinuation等)が始まるまでの間(1拍分)。
 	SongOfTimePauseDur = continuationNormalDur
 )
 
@@ -86,6 +94,24 @@ var SongOfTimeContinuation = []ContinuationNote{
 	{MIDINote: 84, Duration: continuationNormalDur}, // ド₆
 	{MIDINote: 88, Duration: continuationNormalDur}, // ミ₆
 	{MIDINote: 86, Duration: continuationLongDur},   // レ₆ー
+}
+
+// HorseSongContinuation は、プレイヤーがHorseSongName(レ→シ→ラ→レ→シ→ラ)を
+// 正しく演奏した後、確認音(SongOfTimeConfirmationを共用)に続けて
+// 自動再生される「馬の歌」の続き。1オクターブ上げて6オクターブで鳴らす。
+// レ→シ→ラーー→レ→シ→ラーー→レ→シ→ラー→シー→ラー
+var HorseSongContinuation = []ContinuationNote{
+	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
+	{MIDINote: 83, Duration: continuationNormalDur}, // シ₅
+	{MIDINote: 81, Duration: continuationLongDur2},  // ラ₅ーー
+	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
+	{MIDINote: 83, Duration: continuationNormalDur}, // シ₅
+	{MIDINote: 81, Duration: continuationLongDur2},  // ラ₅ーー
+	{MIDINote: 86, Duration: continuationNormalDur}, // レ₆
+	{MIDINote: 83, Duration: continuationNormalDur}, // シ₅
+	{MIDINote: 81, Duration: continuationLongDur},   // ラ₅ー
+	{MIDINote: 83, Duration: continuationLongDur},   // シ₅ー
+	{MIDINote: 81, Duration: continuationLongDur},   // ラ₅ー
 }
 
 // Recognize は演奏されたMelodyが登録済みPatternのいずれかと完全一致するか判定する。

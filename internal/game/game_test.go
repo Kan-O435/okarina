@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Kan-O435/okarina/internal/music"
+	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
 	"github.com/Kan-O435/okarina/internal/world"
 )
@@ -13,6 +14,11 @@ import (
 var songOfTime = music.Melody{
 	{Pitch: music.A}, {Pitch: music.D}, {Pitch: music.F},
 	{Pitch: music.A}, {Pitch: music.D}, {Pitch: music.F},
+}
+
+var horseSong = music.Melody{
+	{Pitch: music.D}, {Pitch: music.B}, {Pitch: music.A},
+	{Pitch: music.D}, {Pitch: music.B}, {Pitch: music.A},
 }
 
 func TestOnMelodyRecorded_SongOfTimeCorrect(t *testing.T) {
@@ -72,6 +78,34 @@ func TestOnMelodyRecorded_SongOfTimeOpensDoorAfterDelay(t *testing.T) {
 
 	if g.door.State != world.DoorOpening {
 		t.Fatalf("expected door to start opening after the delay, got state=%v", g.door.State)
+	}
+}
+
+func TestIsNearDoor(t *testing.T) {
+	g := &Game{}
+	SetInstance(g)
+	defer SetInstance(nil)
+
+	player.Player.Z = renderer.DoorCenterZ
+	if !IsNearDoor() {
+		t.Error("expected IsNearDoor() to be true right at the door")
+	}
+
+	player.Player.Z = renderer.DoorCenterZ + nearDoorRangeZ
+	if !IsNearDoor() {
+		t.Error("expected IsNearDoor() to be true at the edge of the range")
+	}
+
+	player.Player.Z = renderer.DoorCenterZ + nearDoorRangeZ + 1
+	if IsNearDoor() {
+		t.Error("expected IsNearDoor() to be false just outside the range")
+	}
+}
+
+func TestIsNearDoor_NoInstance(t *testing.T) {
+	SetInstance(nil)
+	if IsNearDoor() {
+		t.Error("expected IsNearDoor() to be false when no Game instance is registered")
 	}
 }
 
@@ -141,5 +175,113 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("confirmation/continuation was not played within timeout")
+	}
+}
+
+func TestOnMelodyRecorded_HorseSongCorrect(t *testing.T) {
+	horseSongPlayed = false
+
+	onMelodyRecorded(horseSong)
+
+	if !HorseSongPlayed() {
+		t.Fatal("expected HorseSongPlayed() to be true after playing レシラレシラ correctly")
+	}
+}
+
+func TestOnMelodyRecorded_HorseSongSummonsHorse(t *testing.T) {
+	horseSongPlayed = false
+	summoned := false
+	SetHorseSummoner(func() { summoned = true })
+	defer SetHorseSummoner(nil)
+
+	onMelodyRecorded(horseSong)
+
+	if !summoned {
+		t.Fatal("expected the registered horse summoner to be called")
+	}
+}
+
+func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testing.T) {
+	horseSongPlayed = false
+	defer setSleepHookForTest(func(time.Duration) {})()
+
+	wantTotal := len(music.SongOfTimeConfirmation) + len(music.HorseSongContinuation)
+
+	done := make(chan struct{})
+	var mu sync.Mutex
+	var played []int
+	SetPlayNoteFunc(func(note, velocity int) {
+		mu.Lock()
+		played = append(played, note)
+		n := len(played)
+		mu.Unlock()
+		if n == wantTotal {
+			close(done)
+		}
+	})
+	SetStopNoteFunc(func(note int) {})
+	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+
+	onMelodyRecorded(horseSong)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("confirmation/continuation was not played within timeout")
+	}
+}
+
+// resetJumpGesture はジャンプジェスチャーの検出状態をテスト用に初期化する。
+func resetJumpGesture() {
+	jumpGestureLow = false
+	jumpGestureCount = 0
+}
+
+func TestOnPitchDetected_TwoLowNotesTriggerJump(t *testing.T) {
+	resetJumpGesture()
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	OnPitchDetected(100) // 1回目の低い音(立ち上がり)
+	if triggered != 0 {
+		t.Fatalf("expected no trigger after only one low note, got %d", triggered)
+	}
+
+	OnPitchDetected(0)   // 無音(1回目の低い音が終わる)
+	OnPitchDetected(120) // 2回目の低い音(立ち上がり) → 発火するはず
+	if triggered != 1 {
+		t.Fatalf("expected exactly one trigger after two low notes, got %d", triggered)
+	}
+}
+
+func TestOnPitchDetected_SustainedLowNoteCountsOnce(t *testing.T) {
+	resetJumpGesture()
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	// 同じ低い音を無音を挟まず連続で読み取っても、1回とカウントする。
+	for i := 0; i < 5; i++ {
+		OnPitchDetected(100)
+	}
+	if triggered != 0 {
+		t.Fatalf("expected sustained low pitch readings to count as a single onset, got %d triggers", triggered)
+	}
+}
+
+func TestOnPitchDetected_HighNoteResetsJumpGesture(t *testing.T) {
+	resetJumpGesture()
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	OnPitchDetected(100) // 1回目の低い音
+	OnPitchDetected(0)
+	OnPitchDetected(440) // 明確に高い音 → カウントリセット
+	OnPitchDetected(0)
+	OnPitchDetected(120) // これは(リセット後の)1回目扱いのはず
+	if triggered != 0 {
+		t.Fatalf("expected the gesture count to reset after a clearly high note, got %d triggers", triggered)
 	}
 }

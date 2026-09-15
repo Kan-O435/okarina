@@ -85,3 +85,23 @@ func TestPerspectiveProjectsNearFarZ(t *testing.T) {
 		t.Errorf("Perspective: far plane NDC z = %v, want 1", ndcZ)
 	}
 }
+
+func TestOrthoMapsScreenCornersToNDC(t *testing.T) {
+	// スクリーン座標(左上原点、Y下向き)0..800 x 0..600 を想定。
+	ortho := Ortho(0, 800, 600, 0, -1, 1)
+
+	topLeft := ortho.MulVec4([4]float64{0, 0, 0, 1})
+	if !approxEqual(topLeft[0], -1) || !approxEqual(topLeft[1], 1) {
+		t.Errorf("Ortho: top-left (0,0) -> NDC %v, want (-1, 1, *, *)", topLeft)
+	}
+
+	bottomRight := ortho.MulVec4([4]float64{800, 600, 0, 1})
+	if !approxEqual(bottomRight[0], 1) || !approxEqual(bottomRight[1], -1) {
+		t.Errorf("Ortho: bottom-right (800,600) -> NDC %v, want (1, -1, *, *)", bottomRight)
+	}
+
+	center := ortho.MulVec4([4]float64{400, 300, 0, 1})
+	if !approxEqual(center[0], 0) || !approxEqual(center[1], 0) {
+		t.Errorf("Ortho: center (400,300) -> NDC %v, want (0, 0, *, *)", center)
+	}
+}
