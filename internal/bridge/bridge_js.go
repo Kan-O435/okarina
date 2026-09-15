@@ -23,16 +23,20 @@ func Init() {
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
 	js.Global().Set("goPreviewGanonHallCollapse", js.FuncOf(goPreviewGanonHallCollapse))
 	js.Global().Set("goSummonHorse", js.FuncOf(goSummonHorse))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse)")
+	js.Global().Set("goDebugTriggerTitleStart", js.FuncOf(goDebugTriggerTitleStart))
+	js.Global().Set("goDebugTriggerJump", js.FuncOf(goDebugTriggerJump))
+	js.Global().Set("goDebugTriggerGanonHallMelody", js.FuncOf(goDebugTriggerGanonHallMelody))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
-	// web/grassland.jsのplayHorseJumpSound)の実装をgameパッケージに
-	// 差し込む。これにより、Goから「時の歌」の続きや効果音などを
-	// 自動再生できる。
+	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
+	// playGanonHallCollapseSound)の実装をgameパッケージに差し込む。
+	// これにより、Goから「時の歌」の続きや効果音などを自動再生できる。
 	game.SetPlayNoteFunc(callPlayNote)
 	game.SetStopNoteFunc(callStopNote)
 	game.SetPlayConfirmationFanfareFunc(callPlayConfirmationFanfare)
 	game.SetPlayHorseJumpSoundFunc(callPlayHorseJumpSound)
+	game.SetPlayGanonHallCollapseSoundFunc(callPlayGanonHallCollapseSound)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -57,6 +61,13 @@ func callPlayConfirmationFanfare() {
 // (web/grassland.js、草原フィールドのみで定義される)。
 func callPlayHorseJumpSound() {
 	js.Global().Call("playHorseJumpSound")
+}
+
+// callPlayGanonHallCollapseSound はGoからJavaScript側の
+// playGanonHallCollapseSound()を呼び出し、玉座の間の崩落演出が始まった
+// 際の効果音を再生する(web/ganon-hall.js、玉座の間のみで定義される)。
+func callPlayGanonHallCollapseSound() {
+	js.Global().Call("playGanonHallCollapseSound")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
@@ -158,5 +169,32 @@ func goPreviewGanonHallCollapse(this js.Value, args []js.Value) interface{} {
 func goSummonHorse(this js.Value, args []js.Value) interface{} {
 	game.TriggerHorseSummon()
 	CallConsoleLog("bridge: goSummonHorse() called, summoning horse")
+	return nil
+}
+
+// goDebugTriggerTitleStart はJavaScript側(タイトル画面のデバッグ用Oキー)
+// から呼び出され、MIDIキーボードで「ド(C)」を弾いたのと同じ効果を発生
+// させる。
+func goDebugTriggerTitleStart(this js.Value, args []js.Value) interface{} {
+	game.DebugTriggerTitleStart()
+	CallConsoleLog("bridge: goDebugTriggerTitleStart() called (debug key)")
+	return nil
+}
+
+// goDebugTriggerJump はJavaScript側(草原フィールドのデバッグ用Oキー)から
+// 呼び出され、オタマトーンで低い音を鳴らしたのと同じジャンプジェスチャー
+// を発生させる。
+func goDebugTriggerJump(this js.Value, args []js.Value) interface{} {
+	game.DebugTriggerJump()
+	CallConsoleLog("bridge: goDebugTriggerJump() called (debug key)")
+	return nil
+}
+
+// goDebugTriggerGanonHallMelody はJavaScript側(玉座の間のデバッグ用Oキー)
+// から呼び出され、光のプレリュードを正しく演奏したのと同じ効果
+// (確認音→崩落演出)を発生させる。
+func goDebugTriggerGanonHallMelody(this js.Value, args []js.Value) interface{} {
+	game.DebugTriggerGanonHallMelody()
+	CallConsoleLog("bridge: goDebugTriggerGanonHallMelody() called (debug key)")
 	return nil
 }

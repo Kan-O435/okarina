@@ -13,6 +13,14 @@ if (!WebAssembly) {
         ensureAudioContext();
       });
 
+      // デバッグ用: MIDIキーボード/オカリナが無くても、Oキーで「ド(C)」を
+      // 弾いたのと同じ効果(神殿フィールドへ遷移)を試せるようにする。
+      window.addEventListener('keydown', (event) => {
+        if ((event.key === 'o' || event.key === 'O') && window.goDebugTriggerTitleStart) {
+          window.goDebugTriggerTitleStart();
+        }
+      });
+
       initMIDI();
     })
     .catch((err) => {

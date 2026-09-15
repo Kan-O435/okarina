@@ -89,6 +89,15 @@ if (!WebAssembly) {
         setTimeout(() => stopNote(60), 500);
       });
 
+      // デバッグ用: オタマトーンで低い音を鳴らさなくても、Oキーで
+      // ジャンプジェスチャーを試せるようにする(馬に乗っていない間は
+      // Go側で無視される)。
+      window.addEventListener('keydown', (event) => {
+        if ((event.key === 'o' || event.key === 'O') && window.goDebugTriggerJump) {
+          window.goDebugTriggerJump();
+        }
+      });
+
       initMIDI();
     })
     .catch((err) => {
