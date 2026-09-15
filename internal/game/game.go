@@ -298,6 +298,16 @@ func HorseSongPlayed() bool {
 	return horseSongPlayed
 }
 
+// ganonHallMelodyPlayed は、玉座の間の合図(music.GanonHallMelodyName)が
+// 正しく演奏されたことを示す。
+var ganonHallMelodyPlayed bool
+
+// GanonHallMelodyPlayed は、玉座の間の合図が正しく演奏されたかどうかを
+// 返す。
+func GanonHallMelodyPlayed() bool {
+	return ganonHallMelodyPlayed
+}
+
 // audioHooksMu は、下のplayNoteHook・stopNoteHook・playConfirmationFanfareHook・
 // playHorseJumpSoundHook・sleepHookへの読み書きを保護する。onMelodyRecorded
 // はgoroutineを起動して非同期に曲の続きを再生するため、bridge.Init()での
@@ -374,6 +384,10 @@ func PlayHorseJumpSound() {
 // (SongOfTimeOpening→SongOfTimeContinuation)も行う。馬の歌
 // (music.HorseSongName)が演奏された場合は、確認音→続き(HorseSongContinuation)
 // の再生に合わせて馬を呼び出す(SetHorseSummonerで登録された関数を呼ぶ)。
+// 玉座の間の合図(music.GanonHallMelodyName)が演奏された場合は、確認音
+// (「テレレレレ」)を鳴らした後、崩落演出を開始する
+// (TriggerGanonHallCollapse、玉座の間フィールド以外では登録済み
+// トリガーが無いため何も起きない)。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -400,6 +414,11 @@ func onMelodyRecorded(melody music.Melody) {
 		if horseSummoner != nil {
 			horseSummoner()
 		}
+	}
+
+	if name == music.GanonHallMelodyName {
+		ganonHallMelodyPlayed = true
+		go playGanonHallMelodyAudio()
 	}
 }
 
@@ -436,6 +455,21 @@ func playHorseSongAudio() {
 	playConfirmationFanfare(fanfare, sleep)
 	sleep(music.SongOfTimePauseDur)
 	playNotes(play, stop, sleep, music.HorseSongContinuation)
+}
+
+// playGanonHallMelodyAudio は、プレイヤーが光のプレリュード(玉座の間の
+// 合図)を演奏した後、確認音(「テレレレレ」、時の歌・馬の歌と共用)を
+// 鳴らしてから崩落演出を開始する(TriggerGanonHallCollapse。演出の中で、
+// 岩が降り始める瞬間に別の効果音が鳴る、cmd/ganon-hall/main.go参照)。
+// 確認音の再生用フックが未登録(ネイティブビルドやJS未初期化時)の場合は
+// 確認音を待たずに崩落演出を開始する。
+func playGanonHallMelodyAudio() {
+	audioHooksMu.Lock()
+	sleep, fanfare := sleepHook, playConfirmationFanfareHook
+	audioHooksMu.Unlock()
+
+	playConfirmationFanfare(fanfare, sleep)
+	TriggerGanonHallCollapse()
 }
 
 // playConfirmationFanfare は、時の歌・馬の歌を正しく演奏した際の確認音
