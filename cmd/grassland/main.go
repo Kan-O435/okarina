@@ -16,10 +16,15 @@ import (
 // (徒歩の何倍で進むか)。
 const horseSpeedMultiplier = 2.0
 
-// grasslandObstacleCenterZ/grasslandSongSheetRangeZ は、「馬の歌」の楽譜
-// HUDを表示するかどうかの判定に使う。障害物(柵)からこの距離以内に
-// プレイヤーが近づいたら表示する(神殿フィールドの扉と楽譜HUDの関係と同様)。
-var grasslandObstacleCenterZ = (renderer.GrasslandObstacleNearZ + renderer.GrasslandObstacleFarZ) / 2
+// grasslandFirstObstacleCenterZ/grasslandSongSheetRangeZ は、「馬の歌」の
+// 楽譜HUDを表示するかどうかの判定に使う。最初の柵(道に複数並べたうちの
+// 1つ目、grasslandObstacleZs[0])からこの距離以内にプレイヤーが近づいたら
+// 表示する(神殿フィールドの扉と楽譜HUDの関係と同様)。馬の歌は一度覚えれば
+// 以降の柵でも使えるため、2つ目以降の柵の近くでは表示しない。
+var grasslandFirstObstacleCenterZ = func() float64 {
+	near, far := renderer.GrasslandObstacleBoundsAt(0)
+	return (near + far) / 2
+}()
 
 const grasslandSongSheetRangeZ = 4.0
 
@@ -43,7 +48,7 @@ func main() {
 			ctx.EnableBlend()                    // 城の後ろの後光(透過テクスチャ)を正しく合成するため
 			ctx.ClearColor(0.6, 0.48, 0.65, 1.0) // 薄紫の不穏な空
 
-			scene, link, err := renderer.BuildGrasslandScene(ctx)
+			scene, link, projection, err := renderer.BuildGrasslandScene(ctx)
 			if err != nil {
 				fmt.Println("renderer: failed to build grassland scene:", err)
 			} else {
@@ -51,6 +56,13 @@ func main() {
 				transitioned := false
 				horseIndex := -1
 				var horseLocalTransform vecmath.Mat4
+
+				// cameraTransitionElapsed は、馬に乗ってから経過した時間(秒)。
+				// 馬に乗った瞬間にカメラを一気に切り替えると視点が急に変わって
+				// 分かりにくいため、renderer.GrasslandCameraTransitionDuration
+				// かけて、見下ろし気味の固定カメラからマリオのような横視点
+				// カメラへ滑らかに補間する(下のRunLoop参照)。
+				cameraTransitionElapsed := 0.0
 
 				// 馬の歌が演奏されたら、Linkと同じ場所に馬を呼び出し、以後
 				// Linkが馬に乗って移動しているように見せる。すでに呼んで
@@ -115,12 +127,36 @@ func main() {
 						}
 						scene.Objects[link.Index].Transform = linkTransform
 					}
+
+					// 馬に乗った後は、カメラをマリオのような横視点へ
+					// 滑らかに切り替える。乗る前の固定カメラ(eye/target)から、
+					// プレイヤーのZ座標に追従する横視点カメラ(eye/target)へ、
+					// GrasslandCameraTransitionDuration秒かけて線形補間する。
+					// 遷移が終わった後(t=1)も、この式は毎フレームsideのeye/
+					// targetを現在のplayer.Player.Zから求め直すため、その
+					// まま横視点でプレイヤーを追い続ける。
+					if horseIndex >= 0 {
+						cameraTransitionElapsed += dt
+						t := cameraTransitionElapsed / renderer.GrasslandCameraTransitionDuration
+						if t > 1 {
+							t = 1
+						}
+						t = t * t * (3 - 2*t) // smoothstep: 始点・終点で速度0になる滑らかな遷移
+
+						defaultEye, defaultTarget := renderer.GrasslandDefaultCameraEyeTarget()
+						sideEye, sideTarget := renderer.GrasslandSideCameraEyeTarget(player.Player.Z)
+						eye := defaultEye.Lerp(sideEye, t)
+						target := defaultTarget.Lerp(sideTarget, t)
+						view := vecmath.LookAt(eye, target, renderer.GrasslandCameraUp())
+						scene.ViewProjection = projection.Mul(view)
+					}
+
 					scene.Render(ctx)
 
 					// 馬の歌の楽譜は、障害物に近づいた時だけ表示する。
 					// 馬の歌を演奏し終えたら(呼び出し済みになったら)消す。
 					if horseSongHUD != nil && !game.HorseSongPlayed() &&
-						math.Abs(player.Player.Z-grasslandObstacleCenterZ) <= grasslandSongSheetRangeZ {
+						math.Abs(player.Player.Z-grasslandFirstObstacleCenterZ) <= grasslandSongSheetRangeZ {
 						horseSongHUD.Render(ctx, width, height)
 					}
 
