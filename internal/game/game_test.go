@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Kan-O435/okarina/internal/music"
+	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
 	"github.com/Kan-O435/okarina/internal/world"
 )
@@ -72,6 +73,34 @@ func TestOnMelodyRecorded_SongOfTimeOpensDoorAfterDelay(t *testing.T) {
 
 	if g.door.State != world.DoorOpening {
 		t.Fatalf("expected door to start opening after the delay, got state=%v", g.door.State)
+	}
+}
+
+func TestIsNearDoor(t *testing.T) {
+	g := &Game{}
+	SetInstance(g)
+	defer SetInstance(nil)
+
+	player.Player.Z = renderer.DoorCenterZ
+	if !IsNearDoor() {
+		t.Error("expected IsNearDoor() to be true right at the door")
+	}
+
+	player.Player.Z = renderer.DoorCenterZ + nearDoorRangeZ
+	if !IsNearDoor() {
+		t.Error("expected IsNearDoor() to be true at the edge of the range")
+	}
+
+	player.Player.Z = renderer.DoorCenterZ + nearDoorRangeZ + 1
+	if IsNearDoor() {
+		t.Error("expected IsNearDoor() to be false just outside the range")
+	}
+}
+
+func TestIsNearDoor_NoInstance(t *testing.T) {
+	SetInstance(nil)
+	if IsNearDoor() {
+		t.Error("expected IsNearDoor() to be false when no Game instance is registered")
 	}
 }
 

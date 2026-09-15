@@ -66,6 +66,11 @@ const (
 	// (internal/game)が、自動前進中のLinkがこの位置まで進んだかどうかの
 	// 判定に使うため、パッケージ外から参照できるようにエクスポートする。
 	DoorPassThroughZ = doorCenterZ - 1.5
+
+	// DoorCenterZ は扉のワールド座標(Z)。ゲームループ(internal/game)が
+	// 「プレイヤーが扉に近いかどうか」を判定する際に参照するため、
+	// パッケージ外から参照できるようにエクスポートする。
+	DoorCenterZ = doorCenterZ
 )
 
 // doorOpenAngleRad は扉が全開(progress=1)になったときの回転角。
