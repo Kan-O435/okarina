@@ -5,8 +5,10 @@ import (
 	"runtime"
 
 	"github.com/Kan-O435/okarina/internal/bridge"
+	"github.com/Kan-O435/okarina/internal/game"
 	"github.com/Kan-O435/okarina/internal/player"
 	"github.com/Kan-O435/okarina/internal/renderer"
+	"github.com/Kan-O435/okarina/internal/vecmath"
 )
 
 // 草原フィールド(扉を抜けた先)用のエントリーポイント。神殿フィールド
@@ -35,6 +37,27 @@ func main() {
 			} else {
 				player.Player.Z = link.SpawnZ
 				transitioned := false
+				horseIndex := -1
+				var horseLocalTransform vecmath.Mat4
+
+				// 馬の歌が演奏されたら、Linkの隣に馬を呼び出す。まだ呼んで
+				// いなければSceneにObjectを追加し、すでにいる場合はLinkの
+				// 現在位置まで連れてくる(同じ馬を動かすだけで、何頭も
+				// 増やさない)。
+				game.SetHorseSummoner(func() {
+					if horseIndex < 0 {
+						horse, localTransform, err := renderer.BuildHorseObject(ctx, player.Player.Z)
+						if err != nil {
+							fmt.Println("renderer: failed to build horse object:", err)
+							return
+						}
+						scene.Objects = append(scene.Objects, horse)
+						horseIndex = len(scene.Objects) - 1
+						horseLocalTransform = localTransform
+					} else {
+						scene.Objects[horseIndex].Transform = renderer.HorseTransform(player.Player.Z).Mul(horseLocalTransform)
+					}
+				})
 
 				ctx.RunLoop(func(dt float64) {
 					deltaZ := player.Player.Update(dt)

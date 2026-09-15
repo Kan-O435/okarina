@@ -15,6 +15,11 @@ var songOfTime = music.Melody{
 	{Pitch: music.A}, {Pitch: music.D}, {Pitch: music.F},
 }
 
+var horseSong = music.Melody{
+	{Pitch: music.D}, {Pitch: music.B}, {Pitch: music.A},
+	{Pitch: music.D}, {Pitch: music.B}, {Pitch: music.A},
+}
+
 func TestOnMelodyRecorded_SongOfTimeCorrect(t *testing.T) {
 	songOfTimePlayed = false
 
@@ -136,6 +141,59 @@ func TestOnMelodyRecorded_SongOfTimeTriggersConfirmationAndContinuation(t *testi
 	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
 
 	onMelodyRecorded(songOfTime)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("confirmation/continuation was not played within timeout")
+	}
+}
+
+func TestOnMelodyRecorded_HorseSongCorrect(t *testing.T) {
+	horseSongPlayed = false
+
+	onMelodyRecorded(horseSong)
+
+	if !HorseSongPlayed() {
+		t.Fatal("expected HorseSongPlayed() to be true after playing レシラレシラ correctly")
+	}
+}
+
+func TestOnMelodyRecorded_HorseSongSummonsHorse(t *testing.T) {
+	horseSongPlayed = false
+	summoned := false
+	SetHorseSummoner(func() { summoned = true })
+	defer SetHorseSummoner(nil)
+
+	onMelodyRecorded(horseSong)
+
+	if !summoned {
+		t.Fatal("expected the registered horse summoner to be called")
+	}
+}
+
+func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testing.T) {
+	horseSongPlayed = false
+	defer setSleepHookForTest(func(time.Duration) {})()
+
+	wantTotal := len(music.SongOfTimeConfirmation) + len(music.HorseSongContinuation)
+
+	done := make(chan struct{})
+	var mu sync.Mutex
+	var played []int
+	SetPlayNoteFunc(func(note, velocity int) {
+		mu.Lock()
+		played = append(played, note)
+		n := len(played)
+		mu.Unlock()
+		if n == wantTotal {
+			close(done)
+		}
+	})
+	SetStopNoteFunc(func(note int) {})
+	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+
+	onMelodyRecorded(horseSong)
 
 	select {
 	case <-done:

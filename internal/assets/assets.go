@@ -55,3 +55,11 @@ var GanonBattleScene []byte
 //
 //go:embed models/ganon-hall.glb
 var GanonHall []byte
+
+// Horse は、草原フィールドで「馬の歌」を演奏すると呼び出される馬のGLB
+// (CC0、Quaternius "Ultimate Animated Animal Pack"、docs/assets/horse/
+// README.md参照)。テクスチャ無し、マテリアルの単色のみで構成される
+// 低ポリスタイル。アニメーション・スキニングは未実装のため静止ポーズで表示する。
+//
+//go:embed models/horse.glb
+var Horse []byte
