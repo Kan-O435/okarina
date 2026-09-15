@@ -138,6 +138,64 @@ func SwitchGanonBackground(variant string) {
 	}
 }
 
+// horseSummoner は、草原フィールドで馬を呼び出す(Sceneに馬Objectを追加する)
+// ための関数。cmd/grassland/main.goが起動時に登録する(ganonSwitcherと
+// 同様、gameパッケージがrenderer側の詳細を知る必要がないようコールバックに
+// している)。
+var horseSummoner func()
+
+// SetHorseSummoner は、草原フィールドで馬を呼び出す関数を登録する。
+func SetHorseSummoner(f func()) {
+	horseSummoner = f
+}
+
+// jumpPitchThresholdHz は、この値未満の周波数を「低い音」とみなす閾値。
+// 低い音を2回連続で出すジェスチャーでジャンプを発生させる
+// (馬に乗っている間に障害物を飛び越える、といった用途に使う)。
+const jumpPitchThresholdHz = 180.0
+
+// jumpGestureLow・jumpGestureCount は、「低い音を2回」ジェスチャーの検出
+// 状態。jumpGestureLowは直前の読み取りが低い音の最中だったかどうか
+// (無音や高い音を挟まずに同じ低い音を鳴らし続けている間は2回とカウント
+// しない)、jumpGestureCountは低い音の立ち上がりを検出した回数。
+var (
+	jumpGestureLow   bool
+	jumpGestureCount int
+)
+
+// jumpTrigger は、「低い音を2回」のジェスチャーが成立した際に呼ばれる
+// 関数。cmd/grassland/main.goが起動時に登録する(horseSummonerと同様の
+// コールバックパターン)。馬に乗っていない場合は登録側で無視する想定。
+var jumpTrigger func()
+
+// SetJumpTrigger は、ジャンプジェスチャーが成立した際に呼び出す関数を
+// 登録する。
+func SetJumpTrigger(f func()) {
+	jumpTrigger = f
+}
+
+// updateJumpGesture は、最新のピッチ(Hz)から「低い音を2回」ジェスチャーの
+// 検出状態を進める。低い音の立ち上がり(無音・高い音から低い音に変わった
+// 瞬間)を1回とカウントし、2回連続で検出したらjumpTriggerを呼ぶ。
+// 明確に高い音(低い音ではない、かつ無音でもない)が鳴ったら、それまでの
+// カウントはリセットする(ジェスチャーの途中で別の演奏に移ったとみなす)。
+func updateJumpGesture(freq float64) {
+	isLow := freq > 0 && freq < jumpPitchThresholdHz
+	switch {
+	case isLow && !jumpGestureLow:
+		jumpGestureCount++
+		if jumpGestureCount >= 2 {
+			jumpGestureCount = 0
+			if jumpTrigger != nil {
+				jumpTrigger()
+			}
+		}
+	case freq > 0 && !isLow:
+		jumpGestureCount = 0
+	}
+	jumpGestureLow = isLow
+}
+
 // OpenDoor はブリッジ(JavaScript側)から呼ばれ、登録済みのGameインスタンスの
 // 扉を開く。インスタンスが未登録の場合は何もしない。
 func OpenDoor() {
@@ -160,8 +218,11 @@ func IsNearDoor() bool {
 // 移動方向判定に渡す。ピッチが検出できなかった場合はfreqに0以下を渡す。
 // 実際のプレイヤー移動は、Go側で常時回っているゲームループ
 // (Context.RunLoop、cmd/game/main.go参照)がGame.Update()経由で進める。
+// あわせて、「低い音を2回」のジャンプジェスチャーの検出も進める
+// (updateJumpGesture参照)。
 func OnPitchDetected(freq float64) {
 	player.Player.OnPitch(freq)
+	updateJumpGesture(freq)
 }
 
 // PlayerDirection は現在のプレイヤーの移動方向を文字列で返す
@@ -201,6 +262,15 @@ func SongOfTimePlayed() bool {
 	return songOfTimePlayed
 }
 
+// horseSongPlayed は、馬の歌(music.HorseSongName)が正しく演奏された
+// ことを示す。
+var horseSongPlayed bool
+
+// HorseSongPlayed は、馬の歌が正しく演奏されたかどうかを返す。
+func HorseSongPlayed() bool {
+	return horseSongPlayed
+}
+
 // audioHooksMu は、下のplayNoteHook・stopNoteHook・sleepHookへの読み書きを
 // 保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の続きを再生する
 // ため、bridge.Init()での差し込みやテストでの差し替えと同時に読まれても
@@ -238,7 +308,9 @@ func SetStopNoteFunc(f func(note int)) {
 // (music.SongOfTimeName)が演奏された場合、doorOpenDelayだけ「ため」て
 // から隠し扉を開く。時の歌の場合は、その「ため」の間に確認音
 // (SongOfTimeConfirmation)→曲を最初から通した自動再生
-// (SongOfTimeOpening→SongOfTimeContinuation)も行う。
+// (SongOfTimeOpening→SongOfTimeContinuation)も行う。馬の歌
+// (music.HorseSongName)が演奏された場合は、確認音→続き(HorseSongContinuation)
+// の再生に合わせて馬を呼び出す(SetHorseSummonerで登録された関数を呼ぶ)。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -257,6 +329,14 @@ func onMelodyRecorded(melody music.Melody) {
 	if name == doorMelodyName || name == music.SongOfTimeName {
 		fmt.Printf("[music] %s recognized, opening door in %s\n", name, doorOpenDelay)
 		time.AfterFunc(doorOpenDelay, OpenDoor)
+	}
+
+	if name == music.HorseSongName {
+		horseSongPlayed = true
+		go playHorseSongAudio()
+		if horseSummoner != nil {
+			horseSummoner()
+		}
 	}
 }
 
@@ -277,6 +357,22 @@ func playSongOfTimeAudio() {
 	sleep(music.SongOfTimePauseDur)
 	playNotes(play, stop, sleep, music.SongOfTimeOpening)
 	playNotes(play, stop, sleep, music.SongOfTimeContinuation)
+}
+
+// playHorseSongAudio は、プレイヤーが馬の歌の合図を演奏した後、確認音
+// (music.SongOfTimeConfirmationを共用)に続けてmusic.HorseSongContinuationを
+// 自動再生する。再生用フックが未登録の場合は何もしない。
+func playHorseSongAudio() {
+	audioHooksMu.Lock()
+	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
+	audioHooksMu.Unlock()
+
+	if play == nil || stop == nil {
+		return
+	}
+	playNotes(play, stop, sleep, music.SongOfTimeConfirmation)
+	sleep(music.SongOfTimePauseDur)
+	playNotes(play, stop, sleep, music.HorseSongContinuation)
 }
 
 // playNotes はnotesを順番に、1音ずつ鳴らして止めてを繰り返しながら再生する。

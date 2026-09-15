@@ -49,3 +49,14 @@ func TestRecognize_SongOfTime(t *testing.T) {
 		t.Errorf("Recognize() = %q, want no match for wrong order", name)
 	}
 }
+
+func TestRecognize_HorseSong(t *testing.T) {
+	// 馬の歌: レ→シ→ラ→レ→シ→ラ
+	melody := Melody{
+		{Pitch: D}, {Pitch: B}, {Pitch: A},
+		{Pitch: D}, {Pitch: B}, {Pitch: A},
+	}
+	if name := Recognize(melody, DefaultPatterns); name != HorseSongName {
+		t.Errorf("Recognize() = %q, want %s", name, HorseSongName)
+	}
+}
