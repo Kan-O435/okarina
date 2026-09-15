@@ -1,3 +1,6 @@
+html, body {
+  height: 100%;
+}
 body {
   margin: 0;
   background: #111;
@@ -6,7 +9,6 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 100vh;
   overflow-y: auto;
   padding-bottom: 24px;
 }
@@ -18,7 +20,16 @@ body {
 #status.error { color: #ff8080; }
 canvas {
   background: #000;
-  border: 1px solid #333;
+}
+/* ゲーム画面のcanvasはブラウザの表示領域いっぱいに(上下端まで)表示する。
+   実際の描画解像度(width/height属性)は変えず、object-fit: containで
+   アスペクト比を保ったまま拡大表示するだけなので、カメラ・画角の
+   チューニングには影響しない。 */
+#game-canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
 }
 #bridge-controls,
 #audio-controls {
