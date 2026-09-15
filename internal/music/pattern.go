@@ -21,6 +21,10 @@ const HorseSongName = "HORSE_SONG"
 // 本家ゼルダの「光のプレリュード」(レ→ラ→レ→ラ→シ→レ)を使っている。
 const GanonHallMelodyName = "GANON_HALL_MELODY"
 
+// GanonBattleMelodyName は、戦場跡でGanonの最終形態を倒す合図のPattern名。
+// 本家ゼルダの「嵐の歌」(レ→ファ→レ→レ→ファ→レ)を使っている。
+const GanonBattleMelodyName = "GANON_BATTLE_MELODY"
+
 // DefaultPatterns はゲームで使用する魔法の旋律の定義一覧(MVP)。
 var DefaultPatterns = []Pattern{
 	{Name: "SUN_MELODY", Pitches: []Pitch{C, D, E, G}},
@@ -32,6 +36,8 @@ var DefaultPatterns = []Pattern{
 	{Name: HorseSongName, Pitches: []Pitch{D, B, A, D, B, A}},
 	// 光のプレリュード(演奏で認識させる合図): レ→ラ→レ→ラ→シ→レ
 	{Name: GanonHallMelodyName, Pitches: []Pitch{D, A, D, A, B, D}},
+	// 嵐の歌(演奏で認識させる合図): レ→ファ→レ→レ→ファ→レ
+	{Name: GanonBattleMelodyName, Pitches: []Pitch{D, F, D, D, F, D}},
 }
 
 // ContinuationNote は、自動再生する曲の1音を表す。演奏判定に使うPitch
@@ -61,6 +67,13 @@ const (
 	// 再生が始まるまでが間延びして遅く感じたため、無音部分をffmpegで
 	// 切り詰めた(音が鳴り終わるのは約0.79秒)0.9秒の音声に差し替えている。
 	ConfirmationFanfareDuration = 900 * time.Millisecond
+
+	// GanonBattleSongDuration は、嵐の歌を正しく演奏した後に流す本家の
+	// BGM(mp3の効果音、web/assets/audio/ganon-battle-song-of-storms.mp3)
+	// の再生時間。無音部分をffmpegで切り詰めて5秒にしている。
+	// internal/game.playGanonBattleMelodyAudioが、この時間だけ待ってから
+	// 撃破演出を開始する。
+	GanonBattleSongDuration = 5 * time.Second
 )
 
 // SongOfTimeOpening は、確認音(ConfirmationFanfareDuration)の後に自動再生する
