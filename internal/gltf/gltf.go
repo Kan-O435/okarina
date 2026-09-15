@@ -50,6 +50,8 @@ type Primitive struct {
 
 // document はglTFのJSONチャンクのうち、パースに必要な部分だけを表す。
 type document struct {
+	Scene       *int         `json:"scene"`
+	Scenes      []sceneDoc   `json:"scenes"`
 	Meshes      []mesh       `json:"meshes"`
 	Nodes       []node       `json:"nodes"`
 	Accessors   []accessor   `json:"accessors"`
@@ -57,6 +59,11 @@ type document struct {
 	Materials   []material   `json:"materials"`
 	Textures    []texture    `json:"textures"`
 	Images      []image      `json:"images"`
+}
+
+// sceneDoc はscenes配列の要素。ルートノードの一覧だけを読む。
+type sceneDoc struct {
+	Nodes []int `json:"nodes"`
 }
 
 // texture はtextures配列の要素。どのimageを参照するかだけを読む。
@@ -76,13 +83,20 @@ type textureInfo struct {
 	Index int `json:"index"`
 }
 
-// node はメッシュとスキン(ボーン割り当て)の対応関係だけを読む。
-// KayKit等の人型キャラクターは、体パーツ(頭・胴・腕・脚)ごとに別メッシュへ
-// 分かれており、スキン付きのノードだけを集めることで「装備品(武器・盾・
-// 兜等の付け替えパーツ)を除いた本体だけ」を機械的に判別できる。
+// node はメッシュとスキン(ボーン割り当て)の対応関係、および子ノードと
+// ローカル変換行列を読む。KayKit等の人型キャラクターは、体パーツ(頭・胴・
+// 腕・脚)ごとに別メッシュへ分かれており、スキン付きのノードだけを集める
+// ことで「装備品(武器・盾・兜等の付け替えパーツ)を除いた本体だけ」を
+// 機械的に判別できる。
+//
+// Matrixはmatrixフィールドのみ対応し、translation/rotation/scaleでの
+// 指定(TRS形式)は非対応(今回使用するアセットは全てmatrix形式で
+// 出力されているため。ParseParts参照)。
 type node struct {
-	Mesh *int `json:"mesh"`
-	Skin *int `json:"skin"`
+	Mesh     *int      `json:"mesh"`
+	Skin     *int      `json:"skin"`
+	Matrix   []float64 `json:"matrix"`
+	Children []int     `json:"children"`
 }
 
 type mesh struct {
@@ -147,6 +161,13 @@ func Parse(data []byte) (*Primitive, error) {
 // セグメンテーション機能でパーツ分割したモデルは、パーツごとに別メッシュ・
 // 別マテリアル(別テクスチャ)を持つため、ParseSkinnedのように1つの
 // Primitiveへ結合できない。呼び出し側でパーツごとに別Objectとして描画する。
+// ParseParts はさらに、各メッシュを参照するノードのワールド変換行列
+// (シーンルートからの累積、matrixフィールドのみ対応)を各パーツの頂点に
+// 焼き込む。パーツ分割モデルは、パーツごとに別ノードの位置・回転・
+// スケールで組み立てられている前提のため(例: Sketchfabのオリジナル
+// FBXから変換したモデルは、パーツごとに同じ軸変換+スケール行列を持ち、
+// 装備品パーツだけ別の行列で手元に配置されている)、これを無視すると
+// パーツがバラバラの位置に表示されてしまう。
 func ParseParts(data []byte) ([]Primitive, error) {
 	doc, binChunk, err := parseDocument(data)
 	if err != nil {
@@ -156,8 +177,10 @@ func ParseParts(data []byte) ([]Primitive, error) {
 		return nil, errors.New("gltf: no meshes found")
 	}
 
+	meshWorld := computeMeshWorldMatrices(doc)
+
 	prims := make([]Primitive, 0, len(doc.Meshes))
-	for _, mesh := range doc.Meshes {
+	for meshIdx, mesh := range doc.Meshes {
 		if len(mesh.Primitives) == 0 {
 			continue
 		}
@@ -165,9 +188,113 @@ func ParseParts(data []byte) ([]Primitive, error) {
 		if err != nil {
 			return nil, err
 		}
+		if world, ok := meshWorld[meshIdx]; ok {
+			applyMat4ToPrimitive(world, prim)
+		}
 		prims = append(prims, *prim)
 	}
 	return prims, nil
+}
+
+// mat4 は4x4行列(列優先。glTFのnode.matrixと同じ、m[col*4+row]のレイアウト)。
+type mat4 [16]float64
+
+func mat4Identity() mat4 {
+	return mat4{
+		1, 0, 0, 0,
+		0, 1, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1,
+	}
+}
+
+func mat4Mul(a, b mat4) mat4 {
+	var out mat4
+	for col := 0; col < 4; col++ {
+		for row := 0; row < 4; row++ {
+			var sum float64
+			for k := 0; k < 4; k++ {
+				sum += a[k*4+row] * b[col*4+k]
+			}
+			out[col*4+row] = sum
+		}
+	}
+	return out
+}
+
+// mat4TransformPoint は同次座標(x, y, z, 1)に行列を適用する。
+func mat4TransformPoint(m mat4, x, y, z float32) (float32, float32, float32) {
+	fx, fy, fz := float64(x), float64(y), float64(z)
+	rx := m[0]*fx + m[4]*fy + m[8]*fz + m[12]
+	ry := m[1]*fx + m[5]*fy + m[9]*fz + m[13]
+	rz := m[2]*fx + m[6]*fy + m[10]*fz + m[14]
+	return float32(rx), float32(ry), float32(rz)
+}
+
+// computeMeshWorldMatrices は、シーングラフをルートノードから辿り、各
+// メッシュを参照するノードのワールド変換行列(親からの累積)を計算する。
+func computeMeshWorldMatrices(doc *document) map[int]mat4 {
+	result := make(map[int]mat4)
+	if len(doc.Nodes) == 0 {
+		return result
+	}
+
+	visited := make(map[int]bool)
+	for _, root := range sceneRootNodes(doc) {
+		walkNode(doc, root, mat4Identity(), visited, result)
+	}
+	return result
+}
+
+// sceneRootNodes はデフォルトシーンのルートノード一覧を返す。scenesが
+// 無いGLB(今回使用するアセットには無いケース)では、念のため全ノードを
+// ルート候補として扱う。
+func sceneRootNodes(doc *document) []int {
+	sceneIdx := 0
+	if doc.Scene != nil {
+		sceneIdx = *doc.Scene
+	}
+	if sceneIdx >= 0 && sceneIdx < len(doc.Scenes) {
+		return doc.Scenes[sceneIdx].Nodes
+	}
+	all := make([]int, len(doc.Nodes))
+	for i := range all {
+		all[i] = i
+	}
+	return all
+}
+
+func walkNode(doc *document, nodeIdx int, parent mat4, visited map[int]bool, out map[int]mat4) {
+	if nodeIdx < 0 || nodeIdx >= len(doc.Nodes) || visited[nodeIdx] {
+		return
+	}
+	visited[nodeIdx] = true
+
+	n := doc.Nodes[nodeIdx]
+	local := mat4Identity()
+	if len(n.Matrix) == 16 {
+		for i := 0; i < 16; i++ {
+			local[i] = n.Matrix[i]
+		}
+	}
+	world := mat4Mul(parent, local)
+
+	if n.Mesh != nil {
+		out[*n.Mesh] = world
+	}
+	for _, child := range n.Children {
+		walkNode(doc, child, world, visited, out)
+	}
+}
+
+// applyMat4ToPrimitive は、ワールド変換行列を各頂点に焼き込み、
+// バウンディングボックスを変換後の座標で計算し直す。
+func applyMat4ToPrimitive(m mat4, p *Primitive) {
+	pos := p.Positions
+	for i := 0; i+2 < len(pos); i += 3 {
+		pos[i], pos[i+1], pos[i+2] = mat4TransformPoint(m, pos[i], pos[i+1], pos[i+2])
+	}
+	p.Min, p.Max = computeBounds(pos)
 }
 
 // parseDocument はGLBバイナリからJSONチャンクをパースし、以降の読み取りに
