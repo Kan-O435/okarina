@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/Kan-O435/okarina/internal/assets"
+	"github.com/Kan-O435/okarina/internal/gltf"
 	"github.com/Kan-O435/okarina/internal/vecmath"
 )
 
@@ -145,7 +146,11 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projecti
 
 	// まず不透明なオブジェクトをすべて配置する(深度テストがあるため、
 	// 互いの前後関係は描画順によらず正しく処理される)。
-	objects := []Object{grasslandGroundObject(c), grasslandPathObject(c)}
+	ground, err := grasslandGroundObject(c)
+	if err != nil {
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
+	}
+	objects := []Object{ground, grasslandPathObject(c)}
 
 	castle, err := grasslandCastleObject(c)
 	if err != nil {
@@ -158,6 +163,12 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projecti
 		return nil, LinkPlacement{}, vecmath.Mat4{}, err
 	}
 	objects = append(objects, trees...)
+
+	clouds, err := grasslandTempleCloudObjects(c)
+	if err != nil {
+		return nil, LinkPlacement{}, vecmath.Mat4{}, err
+	}
+	objects = append(objects, clouds...)
 
 	objects = append(objects, grasslandObstacleObjects(c)...)
 
@@ -188,10 +199,21 @@ func BuildGrasslandScene(c *Context) (scene *Scene, link LinkPlacement, projecti
 	}, link, projection, nil
 }
 
-func grasslandGroundObject(c *Context) Object {
+// grasslandGroundObject は、internal/assets.GrasslandGroundTexture(自作の
+// 手続き生成画像、オリーブ〜黄緑〜土色のまだら模様)を貼った地面を返す。
+// 地面はカメラのfarよりずっと広い1枚のquadのため、タイリングはせず
+// そのまま(UV 0..1)貼っている。プレイヤーが実際に動き回る中心付近だけを
+// 見ることになるため、模様は大きく・ゆるやかに見える。
+func grasslandGroundObject(c *Context) (Object, error) {
+	texture, err := c.NewImageTexture(assets.GrasslandGroundTexture, "image/png")
+	if err != nil {
+		return Object{}, err
+	}
+
 	verts := quadVertices(grasslandGroundHalfExtent, grasslandGroundHalfExtent, 0)
-	mesh := c.NewMesh(verts, zeroUVs(4), quadIndices())
-	return Object{Mesh: mesh, Transform: vecmath.Identity(), Color: vecmath.NewVec3(0.3, 0.65, 0.25)}
+	uvs := quadUVsCropped(0, 0, 1, 1)
+	mesh := c.NewMesh(verts, uvs, quadIndices())
+	return Object{Mesh: mesh, Texture: texture, Transform: vecmath.Identity(), Color: vecmath.NewVec3(1, 1, 1)}, nil
 }
 
 // grasslandPathObject は、地面の真ん中(X=0)を奥まで貫く、人が通った跡の
@@ -220,10 +242,55 @@ func grasslandCastleObject(c *Context) (Object, error) {
 	return Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: grasslandCastleColor}, nil
 }
 
-// grasslandCloudColor は、雲の板に付ける色。「濃いめの紫」の不穏な雲を狙う。
+// grasslandCloudColor は、雲(internal/assets.TempleCloud、神殿フィールドと
+// 同じ立体的な雲メッシュ)に付ける色。薄めの紫で、夕暮れの空になじませる。
 var grasslandCloudColor = vecmath.NewVec3(0.32, 0.24, 0.42)
 
-// skyBillboard は、空に浮かべる透過オブジェクト(後光・雲)1枚分の配置情報。
+// grasslandTempleCloudPlacements は、草原フィールドの空に浮かべる雲の配置
+// 一覧。立体的な雲メッシュ(internal/assets.TempleCloud)を、城
+// (grasslandCastleZ=-85)・後光(grasslandHaloZ=-100)よりさらに奥、
+// 遠景の一番後ろに配置している(far=150に対して十分余裕を持たせている)。
+// PartIndexはTempleCloud(16種類)のうちどれを使うかを指定する(見た目を
+// 確認しながら手で選んだもの)。
+var grasslandTempleCloudPlacements = []templeCloudPlacement{
+	{PartIndex: 0, X: -26, Y: 26, Z: -102, Height: 6.0},
+	{PartIndex: 3, X: 22, Y: 22, Z: -110, Height: 5.5},
+	{PartIndex: 5, X: 4, Y: 30, Z: -118, Height: 6.5},
+	{PartIndex: 8, X: -45, Y: 24, Z: -106, Height: 5.5},
+}
+
+// grasslandTempleCloudObjects は、internal/assets.TempleCloudから
+// grasslandTempleCloudPlacementsで指定した雲を選び、grasslandCloudColorで
+// 着色して空に配置する。demo.goのtempleCloudObjectsと同様、実体のある
+// メッシュ(alpha discardが問題になる透過テクスチャの板ではない)ため、
+// 他の不透明なオブジェクトと同様に並べ替え無しで描画してよい。
+func grasslandTempleCloudObjects(c *Context) ([]Object, error) {
+	prims, err := gltf.ParseParts(assets.TempleCloud)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]Object, 0, len(grasslandTempleCloudPlacements))
+	for _, p := range grasslandTempleCloudPlacements {
+		if p.PartIndex < 0 || p.PartIndex >= len(prims) {
+			continue
+		}
+		model, err := c.buildModel(&prims[p.PartIndex])
+		if err != nil {
+			return nil, err
+		}
+		localTransform := model.GroundTransform(0, 0, p.Height)
+		transform := vecmath.Translate(vecmath.NewVec3(p.X, p.Y, p.Z)).Mul(localTransform)
+		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: grasslandCloudColor})
+	}
+	return objects, nil
+}
+
+// grasslandCastleHazeColor は、城の周りに漂わせる薄いモヤの色(白に近い、
+// ごく淡い藤色)。
+var grasslandCastleHazeColor = vecmath.NewVec3(0.78, 0.74, 0.85)
+
+// skyBillboard は、空に浮かべる透過オブジェクト(後光・モヤ)1枚分の配置情報。
 type skyBillboard struct {
 	X, Y, Z      float64
 	HalfW, HalfH float64
@@ -231,28 +298,29 @@ type skyBillboard struct {
 	Color        vecmath.Vec3
 }
 
-// grasslandSkyObjects は、後光・雲(いずれも透過テクスチャの板)をまとめて
-// 組み立てる。このシェーダーはalpha discardをしないため、透明な部分にも
-// 深度が書き込まれる。手前のものを先に描くと、その「見えない」はずの透明な
-// 部分が奥のものを誤って隠してしまうため、奥から手前の順(Zの小さい順)に
-// 並べ替えてから描画用Objectを作る。
+// grasslandSkyObjects は、後光・城の周りのモヤ(いずれも透過テクスチャの板)を
+// まとめて組み立てる。このシェーダーはalpha discardをしないため、透明な
+// 部分にも深度が書き込まれる。手前のものを先に描くと、その「見えない」
+// はずの透明な部分が奥のものを誤って隠してしまうため、奥から手前の順
+// (Zの小さい順)に並べ替えてから描画用Objectを作る。
 func grasslandSkyObjects(c *Context) ([]Object, error) {
 	haloTexture, err := c.NewImageTexture(assets.HaloTexture, "image/png")
 	if err != nil {
 		return nil, err
 	}
-	cloudTexture, err := c.NewImageTexture(assets.CloudTexture, "image/png")
+	hazeTexture, err := c.NewImageTexture(assets.CloudTexture, "image/png")
 	if err != nil {
 		return nil, err
 	}
 
-	// 城や後光と重なりすぎない位置に、奥行きを変えて雲をばらけさせている。
+	// 城の手前の地面近くに、淡い色のモヤを複数枚重ねて漂わせる。城本体
+	// (grasslandCastleZ)より十分手前(+18〜+26)・低い位置(Y=1.5〜2.5)に
+	// 置くことで、城の輪郭(塔・凹凸)に隠れて透けて見えないようにしている。
 	placements := []skyBillboard{
 		{X: 0, Y: grasslandHaloCenterY, Z: grasslandHaloZ, HalfW: grasslandHaloHalfWidth, HalfH: grasslandHaloHalfHeight, Texture: haloTexture, Color: vecmath.NewVec3(1, 1, 1)},
-		{X: -26, Y: 24, Z: -45, HalfW: 20, HalfH: 11, Texture: cloudTexture, Color: grasslandCloudColor},
-		{X: 22, Y: 20, Z: -65, HalfW: 16, HalfH: 9, Texture: cloudTexture, Color: grasslandCloudColor},
-		{X: 4, Y: 27, Z: -90, HalfW: 22, HalfH: 12, Texture: cloudTexture, Color: grasslandCloudColor},
-		{X: -45, Y: 22, Z: -60, HalfW: 18, HalfH: 10, Texture: cloudTexture, Color: grasslandCloudColor},
+		{X: -12, Y: 2, Z: grasslandCastleZ + 20, HalfW: 16, HalfH: 5, Texture: hazeTexture, Color: grasslandCastleHazeColor},
+		{X: 11, Y: 2.5, Z: grasslandCastleZ + 24, HalfW: 14, HalfH: 5, Texture: hazeTexture, Color: grasslandCastleHazeColor},
+		{X: 0, Y: 1.5, Z: grasslandCastleZ + 18, HalfW: 22, HalfH: 4.5, Texture: hazeTexture, Color: grasslandCastleHazeColor},
 	}
 	sort.Slice(placements, func(i, j int) bool {
 		return placements[i].Z < placements[j].Z
@@ -337,23 +405,21 @@ func GrasslandObstacleBlocks(prevZ, newZ float64, jumping bool) (blockedZ float6
 // grasslandTreeHeight は、草原フィールドに置く木の高さ。
 const grasslandTreeHeight = 5.5
 
-// grasslandTreeObjects は、神殿フィールドと同じ木のモデル(CC0、
-// internal/assets.Trees)を1本読み込み、道を挟んで右奥(画面右上寄り)と
-// 左手前(画面左下寄り)に1本ずつ配置する。
+// grasslandTreeObjects は、神殿フィールドと同じ木のモデル(CC BY、
+// internal/assets.TempleTree)を読み込み、道を挟んで右奥(画面右上寄り)と
+// 左手前(画面左下寄り)に1本ずつ配置する。Sketchfabのconverted形式で
+// ルートノードに軸補正の変換行列が入っているため、demo.goのtreeObjectsと
+// 同様、これを焼き込むgltf.ParseParts経由で読み込む(メッシュは1つだけ
+// なのでparts[0]を使う)。
 func grasslandTreeObjects(c *Context) ([]Object, error) {
-	entries, err := assets.Trees.ReadDir("models/trees")
+	prims, err := gltf.ParseParts(assets.TempleTree)
 	if err != nil {
 		return nil, err
 	}
-	if len(entries) == 0 {
+	if len(prims) == 0 {
 		return nil, nil
 	}
-
-	data, err := assets.Trees.ReadFile("models/trees/" + entries[0].Name())
-	if err != nil {
-		return nil, err
-	}
-	model, err := c.LoadGLBMesh(data)
+	model, err := c.buildModel(&prims[0])
 	if err != nil {
 		return nil, err
 	}
