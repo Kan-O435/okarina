@@ -235,6 +235,7 @@ func TestOnMelodyRecorded_HorseSongTriggersConfirmationAndContinuation(t *testin
 func resetJumpGesture() {
 	jumpGestureLow = false
 	jumpGestureCount = 0
+	jumpHighStreak = 0
 }
 
 func TestOnPitchDetected_TwoLowNotesTriggerJump(t *testing.T) {
@@ -278,10 +279,32 @@ func TestOnPitchDetected_HighNoteResetsJumpGesture(t *testing.T) {
 
 	OnPitchDetected(100) // 1回目の低い音
 	OnPitchDetected(0)
-	OnPitchDetected(440) // 明確に高い音 → カウントリセット
+	for i := 0; i < jumpHighResetStreak; i++ {
+		OnPitchDetected(440) // 明確に高い音が連続で続く → カウントリセット
+	}
 	OnPitchDetected(0)
 	OnPitchDetected(120) // これは(リセット後の)1回目扱いのはず
 	if triggered != 0 {
-		t.Fatalf("expected the gesture count to reset after a clearly high note, got %d triggers", triggered)
+		t.Fatalf("expected the gesture count to reset after a sustained high note, got %d triggers", triggered)
+	}
+}
+
+// TestOnPitchDetected_SingleStrayHighReadingDoesNotResetJumpGesture は、
+// オタマトーンのようにピッチをスライドさせて音を変える楽器で、低い音から
+// 次の低い音へ移る一瞬だけ高い周波数を誤検出しても、ジェスチャーの
+// カウントが台無しにならないことを確認する回帰テスト(以前は単発の高い
+// 読み取りで即座にリセットされ、ジャンプがほぼ成立しない原因になっていた)。
+func TestOnPitchDetected_SingleStrayHighReadingDoesNotResetJumpGesture(t *testing.T) {
+	resetJumpGesture()
+	triggered := 0
+	SetJumpTrigger(func() { triggered++ })
+	defer SetJumpTrigger(nil)
+
+	OnPitchDetected(100) // 1回目の低い音
+	OnPitchDetected(440) // ノイズ/スライドによる単発の高い誤検出
+	OnPitchDetected(0)
+	OnPitchDetected(120) // 2回目の低い音 → カウントが生きていれば発火するはず
+	if triggered != 1 {
+		t.Fatalf("expected a single stray high reading not to reset the gesture, got %d triggers", triggered)
 	}
 }
