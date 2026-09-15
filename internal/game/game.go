@@ -309,9 +309,10 @@ func GanonHallMelodyPlayed() bool {
 }
 
 // audioHooksMu は、下のplayNoteHook・stopNoteHook・playConfirmationFanfareHook・
-// playHorseJumpSoundHook・sleepHookへの読み書きを保護する。onMelodyRecorded
-// はgoroutineを起動して非同期に曲の続きを再生するため、bridge.Init()での
-// 差し込みやテストでの差し替えと同時に読まれても安全なようにしている。
+// playHorseJumpSoundHook・playGanonHallCollapseSoundHook・sleepHookへの
+// 読み書きを保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の
+// 続きを再生するため、bridge.Init()での差し込みやテストでの差し替えと
+// 同時に読まれても安全なようにしている。
 var audioHooksMu sync.Mutex
 
 // playNoteHook・stopNoteHook は、Goから直接ブラウザの音声再生(Web Audio
@@ -320,14 +321,18 @@ var audioHooksMu sync.Mutex
 // web/audio.jsのplayConfirmationFanfare)を再生するためのフック。
 // playHorseJumpSoundHookは、馬がジャンプした際のいななき効果音
 // (web/grassland.jsのplayHorseJumpSound)を再生するためのフック。
-// bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未初期化時は
-// nilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
+// playGanonHallCollapseSoundHookは、玉座の間の崩落演出が始まった際の
+// 効果音(web/ganon-hall.jsのplayGanonHallCollapseSound)を再生するための
+// フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未
+// 初期化時はnilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち
+// 時間を省略する)。
 var (
-	playNoteHook                func(note, velocity int)
-	stopNoteHook                func(note int)
-	playConfirmationFanfareHook func()
-	playHorseJumpSoundHook      func()
-	sleepHook                   = time.Sleep
+	playNoteHook                   func(note, velocity int)
+	stopNoteHook                   func(note int)
+	playConfirmationFanfareHook    func()
+	playHorseJumpSoundHook         func()
+	playGanonHallCollapseSoundHook func()
+	sleepHook                      = time.Sleep
 )
 
 // SetPlayNoteFunc は、Goから曲を自動再生する際に使う「1音鳴らす」実装を
@@ -370,6 +375,27 @@ func SetPlayHorseJumpSoundFunc(f func()) {
 func PlayHorseJumpSound() {
 	audioHooksMu.Lock()
 	play := playHorseJumpSoundHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
+}
+
+// SetPlayGanonHallCollapseSoundFunc は、玉座の間の崩落演出が始まった際の
+// 効果音を再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayGanonHallCollapseSoundFunc(f func()) {
+	audioHooksMu.Lock()
+	playGanonHallCollapseSoundHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayGanonHallCollapseSound は、玉座の間の崩落演出(岩が降り始める瞬間)
+// の効果音(mp3、web/assets/audio/ganon-hall-collapse.mp3)を再生する。
+// cmd/ganon-hall/main.goが、崩落演出の開始時に呼ぶ想定。フックが未登録
+// (ネイティブビルドやJS未初期化時)の場合は何もしない。
+func PlayGanonHallCollapseSound() {
+	audioHooksMu.Lock()
+	play := playGanonHallCollapseSoundHook
 	audioHooksMu.Unlock()
 	if play != nil {
 		play()
