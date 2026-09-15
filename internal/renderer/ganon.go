@@ -2,6 +2,7 @@ package renderer
 
 import (
 	"github.com/Kan-O435/okarina/internal/assets"
+	"github.com/Kan-O435/okarina/internal/gltf"
 	"github.com/Kan-O435/okarina/internal/vecmath"
 )
 
@@ -34,28 +35,71 @@ const ganonGroundHalfExtent = 300.0
 // 合わせた地面の色。
 var ganonGroundColor = vecmath.NewVec3(0.4, 0.2, 0.14)
 
-// ganonLinkZ は、Linkをカメラのすぐ手前に立たせておく位置。
-const ganonLinkZ = -20.0
-
-// ganonBossZ/Y/Height は、ボス(internal/assets.GanonBoss)を、背景ジオラマ
-// (internal/assets.GanonBattleScene)自体の地面(tripo_part_0、平らな
-// アリーナ地面ではなく、持ち込んだジオラマ側の岩場)の上に立たせる位置・
-// 高さ。
+// ganonLinkZ/Y は、Linkをカメラの手前・ボスの少し手前に立たせておく
+// 位置。
 //
-// このジオラマは奥へ行くほど地面が盛り上がる地形(手前のZ=-27付近は
-// ほぼY=0だが、Z=-33付近ではY≈1.5でほぼ平ら)になっている。GLBの
-// 生データ(GroundTransform適用前のローカル座標)を直接調べ、X≈0・
-// Z≈-33の地点の頂点群のワールドY(モデルのスケール後)がおよそ1.48〜1.52
-// で揃っていることを確認し、その値(1.5)を採用した。ganonBossZ=-33は
-// この「奥の壁より手前・アリーナ地面より奥」の範囲で、この平らな段差に
-// ちょうど乗る位置。
-//
-// Link(linkTargetHeight=1.4)よりはっきり大柄に見えるよう、高さはその
-// 約2.6倍の3.6にしている。
+// カメラ(Y=6で水平を見る、奥の壁用に画角を狭めてある)は見下ろさない
+// ため、地面に立つ低いキャラクターほど近距離では画面下に切れてしまう
+// (距離dでの画面下端のYは6-d*tan(垂直画角の半分)で、Link(高さ1.4)を
+// 画面に収めるには足元がその値以下である必要がある)。カメラのすぐ
+// 手前(Z=-24、距離4)だと必要距離が約19にもなり、Linkがほぼ画面外に
+// なってしまうため、ボスと同様にジオラマの盛り上がった地形の上に乗せる
+// ことで必要距離を下げている。ボス(Z=-38)の3手前のZ=-35を採用。
+// GLBの生データから見積もった高さ(1.78)ではまだ画面下に隠れて見えな
+// かったため、実際にレンダリングして確認しながらganonLinkYを4.0まで
+// 上げている(この付近の地形は起伏があり、点のサンプリングだけでは
+// 正確な高さを見積もりにくいため、最終的には目視で調整した)。
+// ganonLinkHeight は、戦場跡案でのLinkの高さ。他フィールド共通の
+// linkTargetHeight(1.4)だとボスの近くではやや大きく見えたため、
+// 少し小さめの1.1にしている。
 const (
-	ganonBossZ      = -33.0
-	ganonBossY      = 1.5
-	ganonBossHeight = 3.6
+	ganonLinkZ      = -26.0
+	ganonLinkY      = 4.0
+	ganonLinkHeight = 1.1
+)
+
+// ganonLinkHallZ は、玉座の間案でのLinkの位置。カメラは背景(建物)全体を
+// 映すことを優先し、水平視線(チルト無し、Y=5)のままにしているため、
+// 足元(Y=0)がフレームに収まるにはカメラから垂直画角(半分30°)ぶんの
+// 距離(5÷tan(30°)≈8.66)以上離す必要がある。この制約の中でできるだけ
+// 手前(カメラ寄り)にするため、ちょうどこの境界のZ=-37.5にしている。
+// ganonLinkHallY は、Linkの足元を少し持ち上げるオフセット。建物の床
+// (装飾等)に埋もれて見えたため、ganonBossHallYと同様に少し浮かせている。
+// ganonLinkHallHeight は、玉座の間案でのLinkの高さ。他フィールド共通の
+// linkTargetHeight(1.4)より小さめの1.0にしている。
+const (
+	ganonLinkHallZ      = -37.5
+	ganonLinkHallY      = 0.3
+	ganonLinkHallHeight = 1.0
+)
+
+// ganonBossBattleZ/Y/Height は、戦場跡案でのボス(internal/assets.
+// GanonBossBattle、緑色・角のある獣形態)の位置・高さ。このモデルは
+// バインドポーズが前傾姿勢(しゃがんで武器を構えたようなポーズ)で
+// 書き出されているため、CombinedGroundTransformで足元をY=0に置くと
+// 手前のLinkや地形の起伏にほぼ隠れてしまう。ganonLinkY(=4.0)と同様、
+// この付近の地形が高く盛り上がっているため、はっきり見える高さまで
+// 持ち上げてY=3.05にしている。
+const (
+	ganonBossBattleZ      = -38.0
+	ganonBossBattleY      = 3.05
+	ganonBossBattleHeight = 3.6
+)
+
+// ganonBossHallZ/Y は、玉座の間案(GanonBackgroundHall)でのボスの位置。
+// 玉座の間モデル(ganonHallHeight=10へスケール後)は半奥行4.49で、
+// ganonBackgroundZ(-40)を中心にZ≈-35.51(手前の入口側)〜Z≈-44.49
+// (奥の壁側)の範囲を占める。ganonBossZ(-33)は手前の面より外(建物の
+// 外)にあたるため、玉座の間案では代わりに建物の中に収まるZを使う
+// (-41から、もう少し手前(入口側)へ寄せて-38.5)。床は平らだと仮定して
+// Y=0から始めたが、建物側の床(装飾等)に埋まって見えたため、少し
+// (0.4)持ち上げている。
+// ganonBossHallHeight は、玉座の間案でのボスの高さ。戦場跡案(ganonBossHeight
+// =3.6)より小さめの2.8にしている(建物の中で見ると3.6は大きすぎたため)。
+const (
+	ganonBossHallZ      = -38.5
+	ganonBossHallY      = 0.9
+	ganonBossHallHeight = 2.2
 )
 
 // GanonBackgroundVariant は、ガノンフィールドの背景デザイン案(戦場跡/
@@ -95,22 +139,22 @@ func BuildGanonScene(c *Context, variant GanonBackgroundVariant) (scene *Scene, 
 	}
 	objects = append(objects, background...)
 
-	boss, err := ganonBossObject(c)
+	boss, err := ganonBossObject(c, variant)
 	if err != nil {
 		return nil, LinkPlacement{}, err
 	}
 	objects = append(objects, boss...)
 
-	linkObj, linkLocal, err := ganonLinkObject(c)
+	linkSpawnZ, linkY, linkHeight := ganonLinkZ, ganonLinkY, ganonLinkHeight
+	if variant == GanonBackgroundHall {
+		linkSpawnZ, linkY, linkHeight = ganonLinkHallZ, ganonLinkHallY, ganonLinkHallHeight
+	}
+
+	linkObjs, linkLocal, err := ganonLinkObject(c, linkSpawnZ, linkY, linkHeight)
 	if err != nil {
 		return nil, LinkPlacement{}, err
 	}
-	objects = append(objects, linkObj)
-	link = LinkPlacement{
-		Index:          len(objects) - 1,
-		LocalTransform: linkLocal,
-		SpawnZ:         ganonLinkZ,
-	}
+	objects, link = appendLinkObjects(objects, linkObjs, linkLocal, linkSpawnZ)
 
 	return &Scene{
 		Program:        program,
@@ -128,9 +172,16 @@ func BuildGanonScene(c *Context, variant GanonBackgroundVariant) (scene *Scene, 
 // 横幅を画面いっぱいに収めるだけなら距離8.98で足りるが、より近づいた
 // 構図にするため、横幅が画面の外に少しはみ出るのを許容して距離6.7まで
 // 詰めている(camZ = 手前の面(-35.51) + 6.7 ≈ -28.8)。
+//
+// ganonHallCameraTargetY は注視点の高さ。一時的に見下ろすチルトを付けて
+// 試したが、それだと建物の上部がフレームからはみ出し「背景全体を映す」
+// 条件を満たさなくなるため、カメラと同じY=5(水平視線・チルト無し)に
+// 戻している。Linkの距離はganonLinkHallZ側で、この水平視線のまま
+// 全身が入る最短距離に調整する。
 const (
-	ganonHallCameraY = 5.0
-	ganonHallCameraZ = -28.8
+	ganonHallCameraY       = 5.0
+	ganonHallCameraZ       = -28.8
+	ganonHallCameraTargetY = 5.0
 )
 
 // ganonBattleFOVDegrees は、戦場跡案において「奥の壁の横幅がちょうど画面の
@@ -164,7 +215,7 @@ func ganonCameraView(variant GanonBackgroundVariant) vecmath.Mat4 {
 	if variant == GanonBackgroundHall {
 		return vecmath.LookAt(
 			vecmath.NewVec3(0, ganonHallCameraY, ganonHallCameraZ),
-			vecmath.NewVec3(0, ganonHallCameraY, ganonBackgroundZ),
+			vecmath.NewVec3(0, ganonHallCameraTargetY, ganonBackgroundZ),
 			vecmath.NewVec3(0, 1, 0),
 		)
 	}
@@ -174,11 +225,13 @@ func ganonCameraView(variant GanonBackgroundVariant) vecmath.Mat4 {
 	// 高さを背景の縦方向の中心(Y=5、高さ10の半分)に合わせたうえで寄せ、
 	// 上下方向の隙間が出ないようにしている。
 	//
-	// カメラをX=3だけ右にずらし、Z方向にも3だけ前(奥へ)寄せている
-	// (視点・注視点を同じだけ動かし、視線の向き自体は変えていない)。
+	// カメラをZ方向に3だけ前(奥へ)寄せている(視点・注視点を同じだけ
+	// 動かし、視線の向き自体は変えていない)。X=0のまま(ボスもX=0に
+	// 立っているため、これでボスのほぼ正面に来る)。Yも5→6に上げている
+	// (視点・注視点とも同じだけ、水平視線のまま)。
 	return vecmath.LookAt(
-		vecmath.NewVec3(3, 5, -20),
-		vecmath.NewVec3(3, 5, -38),
+		vecmath.NewVec3(0, 6, -20),
+		vecmath.NewVec3(0, 6, -38),
 		vecmath.NewVec3(0, 1, 0),
 	)
 }
@@ -218,35 +271,116 @@ func ganonBackgroundObjects(c *Context, variant GanonBackgroundVariant) ([]Objec
 	return objects, nil
 }
 
-// ganonBossObject は、背景ジオラマの地形の上(ganonBossZ/Y)にボス
-// (internal/assets.GanonBoss)を配置する。LinkKnightと同じく体パーツごとに
-// 分かれたスキン付きモデルのため、LoadSkinnedGLBMeshで全パーツを1つに
-// 結合して読み込む。GroundTransformは足元をY=0に置くため、そのあとに
-// ganonBossY分だけワールド空間で持ち上げて、ジオラマの地面の高さに
-// 合わせている。現時点では静止しているだけで、専用の行動・アニメーションは
-// まだ無い。
-func ganonBossObject(c *Context) ([]Object, error) {
-	model, err := c.LoadSkinnedGLBMesh(assets.GanonBoss)
+// ganonBossObject は、背景(戦場跡の地形/玉座の間の建物内)の中にボスを
+// 配置する。variantに応じてモデル・Z/Y位置を切り替える(戦場跡案は
+// internal/assets.GanonBossBattle(緑色・角のある獣形態)をganonBossBattle
+// Z/Y、玉座の間案はinternal/assets.GanonBoss(人型のガノンドロフ)を建物の
+// 中に収まるganonBossHallZ/Yに配置する)。どちらもSketchfabのファンアート
+// モデルで、スキンは無くパーツごとに別メッシュ・別テクスチャへ分かれて
+// いるため、背景ジオラマ(ganonBackgroundObjects参照)と同様にLoadGLBParts
+// (ここではgltf.ParseParts+buildModel)/CombinedGroundTransformで読み込む。
+// CombinedGroundTransformは足元をY=0に置くため、そのあとにY分だけ
+// ワールド空間で持ち上げる。現時点では静止しているだけで、専用の行動・
+// アニメーションはまだ無い。
+func ganonBossObject(c *Context, variant GanonBackgroundVariant) ([]Object, error) {
+	bossAsset := assets.GanonBossBattle
+	bossZ, bossY, bossHeight := ganonBossBattleZ, ganonBossBattleY, ganonBossBattleHeight
+	if variant == GanonBackgroundHall {
+		bossAsset = assets.GanonBoss
+		bossZ, bossY, bossHeight = ganonBossHallZ, ganonBossHallY, ganonBossHallHeight
+	}
+
+	// gltf.ParseParts()は各パーツの元ノードのワールド変換行列(位置・回転・
+	// スケール)を頂点に焼き込んで返すため、パーツごとに軸や縮尺が異なる
+	// モデル(装備品パーツが体とは別の行列を持つ等)でも正しく組み上がる。
+	prims, err := gltf.ParseParts(bossAsset)
 	if err != nil {
 		return nil, err
 	}
 
-	transform := vecmath.Translate(vecmath.NewVec3(0, ganonBossY, 0)).Mul(model.GroundTransform(0, ganonBossZ, ganonBossHeight))
-	return []Object{{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}}, nil
-}
-
-// ganonLinkObject は、神殿・草原フィールドと同じKayKit Knightモデル
-// (internal/assets.LinkKnight)を配置する。他のフィールドのlinkObjectと
-// 同様、localTransformを別に返し、プレイヤーの位置・向きと組み合わせて
-// 毎フレームTransformを再構築できるようにする。
-func ganonLinkObject(c *Context) (obj Object, localTransform vecmath.Mat4, err error) {
-	model, err := c.LoadSkinnedGLBMesh(assets.LinkKnight)
-	if err != nil {
-		return Object{}, vecmath.Mat4{}, err
+	parts := make([]*Model, len(prims))
+	for i := range prims {
+		model, err := c.buildModel(&prims[i])
+		if err != nil {
+			return nil, err
+		}
+		parts[i] = model
 	}
 
-	localTransform = model.GroundTransform(0, 0, linkTargetHeight)
-	transform := vecmath.Translate(vecmath.NewVec3(0, 0, ganonLinkZ)).Mul(localTransform)
-	obj = Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}
-	return obj, localTransform, nil
+	// gltf.ParseParts()がノードのワールド変換行列を焼き込むようになった
+	// ことで、GanonBoss/GanonBossBattleとも元から+Z(カメラ・Linkのいる方)
+	// を向いた状態で読み込まれるため、追加の回転は不要になった
+	// (以前はここでSketchfabのconverted形式向けの補正回転を入れていた)。
+	localTransform := CombinedGroundTransform(parts, 0, 0, bossHeight)
+	transform := vecmath.Translate(vecmath.NewVec3(0, bossY, bossZ)).Mul(localTransform)
+	objects := make([]Object, len(parts))
+	for i, part := range parts {
+		objects[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
+	}
+	return objects, nil
+}
+
+// ganonLinkObject は、神殿・草原フィールドと同じLinkモデル
+// (internal/assets.LinkKnight)をspawnZの位置に配置する。他のフィールドの
+// linkObjectと同様、localTransformを別に返し、プレイヤーの位置・向きと
+// 組み合わせて毎フレームTransformを再構築できるようにする。
+func ganonLinkObject(c *Context, spawnZ, spawnY, targetHeight float64) (objs []Object, localTransform vecmath.Mat4, err error) {
+	parts, err := loadLinkParts(c)
+	if err != nil {
+		return nil, vecmath.Mat4{}, err
+	}
+
+	// spawnYは、戦場跡案でジオラマの盛り上がった地形の上に立たせるための
+	// ワールド空間の底上げ(ganonLinkY参照。玉座の間案では0)。player.State.
+	// Transform()が組み立てる最終的な配置にも常に反映され続ける必要があるため
+	// (ジャンプ・歩行バウンド等のY方向オフセットと同様に一時的なものではなく、
+	// 固定の底上げ)、呼び出し側が毎フレーム使うlocalTransform自体に焼き込む。
+	localTransform = vecmath.Translate(vecmath.NewVec3(0, spawnY, 0)).Mul(CombinedGroundTransform(parts, 0, 0, targetHeight))
+	// 初期姿勢(スポーン時点でカメラの逆を向く)はplayer.Player.SpawnAtが
+	// 設定するYaw=πを使ってcmd/ganon-battle, cmd/ganon-hall側が
+	// SetLinkTransformで組み立て直すため、ここでは仮の向き(Identity)で
+	// 構わない。
+	transform := vecmath.Translate(vecmath.NewVec3(0, 0, spawnZ)).Mul(localTransform)
+	objs = make([]Object, len(parts))
+	for i, part := range parts {
+		objs[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
+	}
+	return objs, localTransform, nil
+}
+
+// GanonHallCollapseRockColor は、玉座の間が崩れる演出で降ってくる岩の色
+// (地面と近い暗めの岩肌色)。
+var GanonHallCollapseRockColor = vecmath.NewVec3(0.32, 0.26, 0.21)
+
+// GanonHallCollapseRockPlacement は、崩落演出で降らせる岩1個ぶんの
+// X/Z位置(固定)と半サイズ。Yは時間経過で上から下へ動かすため、
+// ここには含めない(cmd/ganon-hall/main.goが毎フレーム計算する)。
+type GanonHallCollapseRockPlacement struct {
+	X, Z, HalfSize float64
+}
+
+// GanonHallCollapseRockPlacements は、Ganonの第一形態を倒した演出
+// (玉座の間が崩れ、岩が降ってくる → 戦場跡フィールドへページ遷移)で
+// 降らせる岩の配置一覧。「特定の演奏でボスを倒す」処理はまだ無いため、
+// 現時点ではデバッグボタン(cmd/ganon-hall/main.go、web/ganon-hall.html
+// 参照)から直接トリガーする仮実装。玉座周辺(ganonBossHallZ付近)に
+// ばらけて降るよう、位置・サイズを少しずつ変えている。
+var GanonHallCollapseRockPlacements = []GanonHallCollapseRockPlacement{
+	{X: -3.0, Z: -33.0, HalfSize: 1.0},
+	{X: 2.2, Z: -35.0, HalfSize: 1.3},
+	{X: -1.3, Z: -38.0, HalfSize: 0.9},
+	{X: 3.4, Z: -37.0, HalfSize: 1.1},
+	{X: 0.2, Z: -34.0, HalfSize: 1.4},
+	{X: -3.4, Z: -39.0, HalfSize: 1.0},
+}
+
+// GanonHallCollapseRockObject は、崩落演出用の岩1個ぶんのObjectを、
+// 指定したワールドY(呼び出し側が毎フレーム更新する)で組み立てる。
+// 見た目は単色の直方体(boxVertices/boxIndices、テクスチャ無し)で十分と
+// 判断し、専用モデルは用意していない。
+func GanonHallCollapseRockObject(c *Context, p GanonHallCollapseRockPlacement, y float64) Object {
+	verts := boxVertices(float32(p.HalfSize), float32(p.HalfSize*2), float32(p.HalfSize))
+	mesh := c.NewMesh(verts, zeroUVs(8), boxIndices())
+	transform := vecmath.Translate(vecmath.NewVec3(p.X, y, p.Z))
+	return Object{Mesh: mesh, Transform: transform, Color: GanonHallCollapseRockColor}
 }
