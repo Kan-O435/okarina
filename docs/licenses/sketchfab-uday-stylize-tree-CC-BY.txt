@@ -1,0 +1,25 @@
+Stylize Tree Lowpoly
+
+Author: uday (https://sketchfab.com/udayjeet)
+Source: https://sketchfab.com/3d-models/stylize-tree-lowpoly-dcf20a5a86784331a34657e94442511f
+
+License: Creative Commons Attribution (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution:
+"Stylize Tree Lowpoly" by uday is licensed under Creative Commons
+Attribution.
+
+---
+
+Used as internal/assets/models/temple-tree.glb (internal/assets.TempleTree),
+the tree model for the temple field (cmd/game / internal/renderer/demo.go's
+treeObjects) and the grassland field (cmd/grassland / internal/renderer/
+grassland.go's grasslandTreeObjects). Replaces the previous CC0 Gobkit
+Nature Kit low-poly trees in both fields; internal/assets.Trees (Gobkit) is
+no longer referenced by any field. The ganon field does not have trees.
+
+Single mesh with an embedded base color texture. Sketchfab's "converted"
+export puts an axis-correction matrix on the root node, so it's loaded via
+gltf.ParseParts (which bakes node transforms) rather than the plain
+LoadGLBMesh path, taking parts[0] since there's only one mesh.

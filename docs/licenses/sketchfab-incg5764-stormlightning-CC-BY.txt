@@ -1,0 +1,23 @@
+3 Pack of Storm Lightning
+
+Author: Incg5764 (https://sketchfab.com/incg5764)
+Source: https://sketchfab.com/3d-models/3-pack-of-storm-lightning-8acf90c132754b6bb9ab2b60ebd9465f
+
+License: Creative Commons Attribution (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution:
+"3 Pack of Storm Lightning" by Incg5764 is licensed under
+Creative Commons Attribution.
+
+---
+
+Used as internal/assets/models/ganon-lightning.glb (internal/assets.GanonLightning),
+the lightning bolt struck down onto the boss during the ganon-battle field's
+final-form defeat cutscene (cmd/ganon-battle, internal/renderer/ganon.go's
+GanonBattleLightningObject).
+
+3 low-poly forked lightning bolt meshes in one GLB (simple blue-white
+emissive material, no embedded texture), loaded with gltf.ParseParts like
+the Ganon boss assets; only one of the 3 is used, picked for having the
+most compact/vertical shape.

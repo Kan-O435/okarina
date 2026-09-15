@@ -1,0 +1,500 @@
+package renderer
+
+import (
+	"math/rand"
+
+	"github.com/Kan-O435/okarina/internal/assets"
+	"github.com/Kan-O435/okarina/internal/gltf"
+	"github.com/Kan-O435/okarina/internal/vecmath"
+)
+
+// このファイルは「時の神殿」フィールド(docs/fields/temple-of-time.md参照)の
+// 土台となるデモシーンを組み立てる。
+//
+// 自作で完結する部分(地面・道・プール)は実寸で配置する。
+// 建物本体+双尖塔はTripo3Dで生成・リメッシュ済みのGLB(internal/assets)を
+// go:embedで読み込んで実際に配置している。扉(#3)はまだ3Dモデル自体は無いが、
+// CC0のドア画像(internal/assets.DoorTexture)を貼った板で見た目を確保している。
+
+const (
+	groundHalfExtent = 500.0 // 地面: カメラのfar(150)より十分大きく、実質無限に見えるサイズにしておく
+
+	pathHalfWidth = 2.0
+	pathNearZ     = 22.0  // 道の手前端(スポーン地点)
+	pathFarZ      = -16.0 // 道の奥端(神殿の手前)
+
+	poolHalfWidth = 2.0
+	poolHalfDepth = 4.0
+	poolCenterZ   = -10.0
+	poolOffsetX   = 5.0 // 道を挟んで左右に配置
+
+	// groundEdgeBorderWidth は、道・プールの縁に付ける茶色い縁取りの幅
+	// (本体の半径にこの分だけ足した大きさの板を、本体より低いY・先に描く
+	// ことで縁だけがはみ出して見えるようにする)。
+	groundEdgeBorderWidth = 0.4
+
+	linkSpawnZ       = poolCenterZ + poolHalfDepth // Linkの足元をプール手前端(カメラ側の辺)に揃える
+	linkTargetHeight = 1.4                         // Linkモデル(internal/assets.LinkKnight)をこの高さになるようスケールする
+
+	buildingTargetHeight = 10.0 // GLBモデルをこの高さになるようスケールする
+	// buildingCenterZ: 道の奥端(pathFarZ=-16)との隙間を詰めるため手前に寄せた
+	// (実測の建物前面はbuildingCenterZ+buildingHalfDepthMeasuredになる。
+	// 沈める(Yをずらす)のではなく、地面(Y=0)に正しく立てたままZだけ動かす)。
+	buildingCenterZ = -21.0
+
+	// 扉画像(512x512)は、中央の木の扉の周りに白っぽい石枠・透過の余白が
+	// 写っている。実測したところ、木の扉本体はピクセル座標で
+	// x=130〜395(左右の石枠を除く)、y=28〜474(上下の透過の余白を除く、
+	// PNGは上端がy=0)の範囲。UV座標をこの範囲に絞ることで、扉の絵だけが
+	// quadいっぱいに表示されるようにする(下に透過部分があると、そこから
+	// 背景の建物本体の壁の色が透けて「白い余白」のように見えてしまうため)。
+	doorTextureU0 = 130.0 / 512.0
+	doorTextureU1 = 395.0 / 512.0
+	// NewImageTextureはUNPACK_FLIP_Y_WEBGLで画像を上下反転して取り込むため、
+	// V座標は「1 - (PNGのy座標/512)」で計算する(V=0がPNGの下端に対応)。
+	doorTextureV0 = 1.0 - 474.0/512.0 // PNG y=474(扉の下端)に対応
+	doorTextureV1 = 1.0 - 28.0/512.0  // PNG y=28(扉の上端)に対応
+
+	// doorHalfWidth/doorHeight は、上記のトリミング後の扉画像(265x446px)を
+	// ピクセル密度が縦横で揃うようスケールした見た目のサイズ。
+	// (基準: 512px = doorHeightを出す前のスケール0.005859 units/px)
+	doorHalfWidth = 0.56
+	doorHeight    = 1.9
+	// 建物本体(Tripo3D生成GLB)は高さ10へ自動スケールすると最前面が
+	// buildingCenterZ+buildingHalfDepthMeasured ≈ -17.73まで張り出す
+	// (bounding boxから逆算した実測値)。扉が建物の中に埋もれないよう、
+	// 前面よりさらに手前(道の奥端pathFarZ=-16のすぐ内側)に出す。
+	doorCenterZ = -16.0
+	doorHingeX  = -doorHalfWidth // 扉が開くときに軸となる蝶番のローカルX座標(左端)
+
+	// DoorPassThroughZ は、Linkが扉を「すり抜け終わった」とみなすZ座標
+	// (扉の位置doorCenterZより1.5ユニットさらに奥)。ゲームループ
+	// (internal/game)が、自動前進中のLinkがこの位置まで進んだかどうかの
+	// 判定に使うため、パッケージ外から参照できるようにエクスポートする。
+	DoorPassThroughZ = doorCenterZ - 1.5
+
+	// DoorCenterZ は扉のワールド座標(Z)。ゲームループ(internal/game)が
+	// 「プレイヤーが扉に近いかどうか」を判定する際に参照するため、
+	// パッケージ外から参照できるようにエクスポートする。
+	DoorCenterZ = doorCenterZ
+)
+
+// doorOpenAngleRad は扉が全開(progress=1)になったときの回転角。
+var doorOpenAngleRad = vecmath.Radians(100)
+
+// LinkPlacement は、呼び出し側(ゲームループ)がLinkの位置・向きを毎フレーム
+// 書き換えるために必要な情報をまとめたもの。
+type LinkPlacement struct {
+	// Indices は、scene.ObjectsのうちLinkに対応する要素のインデックス一覧。
+	// LinkKnightはパーツごとに別メッシュ・別テクスチャへ分かれているため、
+	// 1体につき複数のObjectになる(呼び出し側は全インデックスに同じ
+	// Transformを設定する)。
+	Indices []int
+	// LocalTransform は、ワールド上の位置・向きを一切含まない、Link自身の
+	// 原点(足元・中心)を基準にした変換(スケール+モデル原点補正のみ)。
+	// 毎フレーム Translate(worldPos).Mul(RotateY(yaw)).Mul(LocalTransform) の
+	// ように組み立て直すことで、位置と向きを独立に更新できる。
+	LocalTransform vecmath.Mat4
+	// SpawnZ はLinkの初期スポーン位置(Z座標)。
+	SpawnZ float64
+}
+
+// appendLinkObjects は、linkObject/grasslandLinkObject/ganonLinkObjectが返す
+// パーツ一覧をobjectsの末尾に追加し、対応するIndicesを含むLinkPlacementを
+// 組み立てる(3フィールド共通の処理のためここにまとめている)。
+func appendLinkObjects(objects []Object, linkObjs []Object, localTransform vecmath.Mat4, spawnZ float64) ([]Object, LinkPlacement) {
+	start := len(objects)
+	objects = append(objects, linkObjs...)
+	indices := make([]int, len(linkObjs))
+	for i := range indices {
+		indices[i] = start + i
+	}
+	return objects, LinkPlacement{Indices: indices, LocalTransform: localTransform, SpawnZ: spawnZ}
+}
+
+// SetLinkTransform は、link.Indicesが指す全てのscene.Objectsに同じtransformを
+// 設定する(Linkはパーツごとに複数Objectに分かれているため、1体分の見た目を
+// 更新するには全パーツに同じTransformを設定する必要がある)。シーン構築直後の
+// 初期姿勢(スポーン時点でカメラの逆を向かせる)の設定と、毎フレームの
+// プレイヤー移動に合わせた更新の両方から使う。
+func SetLinkTransform(scene *Scene, link LinkPlacement, transform vecmath.Mat4) {
+	for _, idx := range link.Indices {
+		scene.Objects[idx].Transform = transform
+	}
+}
+
+// BuildFieldDemoScene は「時の神殿」フィールドの土台(地面・道・プール+
+// 建物本体・扉・Link)を配置したSceneを組み立てる。
+// 戻り値のLinkPlacementは、プレイヤー移動に合わせて呼び出し側がLinkの
+// Transformを書き換えるために使う。doorIndexは扉Objectのインデックス
+// (毎フレーム扉のTransformを更新するために使う)。
+func BuildFieldDemoScene(c *Context) (scene *Scene, link LinkPlacement, doorIndex int, err error) {
+	program, err := c.NewProgram(basicVertexShaderSrc, basicFragmentShaderSrc)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+
+	width, height := c.CanvasSize()
+	aspect := float64(width) / float64(height)
+	projection := vecmath.Perspective(vecmath.Radians(55), aspect, 0.1, 150)
+	view := vecmath.LookAt(
+		vecmath.NewVec3(0, 6.24, 6.03),  // カメラ位置: 手前の枠が池の手前端の少し手前(Z=-5、緑が少し残る程度)、左右の枠が木のライン(X=±7.8)に合うよう計算
+		vecmath.NewVec3(0, 5.72, -8.96), // 注視点: 神殿の手前あたり
+		vecmath.NewVec3(0, 1, 0),
+	)
+
+	objects := []Object{groundObject(c)}
+	objects = append(objects, pathObjects(c)...)
+	objects = append(objects, poolObjects(c, -poolOffsetX)...)
+	objects = append(objects, poolObjects(c, poolOffsetX)...)
+	templeBody, err := templeBodyObject(c)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+	objects = append(objects, templeBody)
+
+	linkObjs, linkLocal, err := linkObject(c)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+	objects, link = appendLinkObjects(objects, linkObjs, linkLocal, linkSpawnZ)
+
+	trees, err := treeObjects(c)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+	objects = append(objects, trees...)
+
+	clouds, err := templeCloudObjects(c)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+	objects = append(objects, clouds...)
+
+	// 扉は背景が透過のテクスチャを使うため、後ろにある建物本体などの不透明な
+	// オブジェクトがすでに描画された後(=Objectsの最後)に描画する。先に描くと、
+	// 扉の透過部分が「まだ何も描かれていない背景色」と合成され、後から描かれる
+	// 建物にその部分だけ穴が空いたように見えてしまう。
+	doorIndex = len(objects)
+	door, err := doorObject(c)
+	if err != nil {
+		return nil, LinkPlacement{}, -1, err
+	}
+	objects = append(objects, door)
+
+	return &Scene{
+		Program:        program,
+		ViewProjection: projection.Mul(view),
+		Objects:        objects,
+	}, link, doorIndex, nil
+}
+
+func groundObject(c *Context) Object {
+	verts := quadVertices(groundHalfExtent, groundHalfExtent, 0)
+	mesh := c.NewMesh(verts, zeroUVs(4), quadIndices())
+	return Object{Mesh: mesh, Transform: vecmath.Identity(), Color: vecmath.NewVec3(0.35, 0.55, 0.25)}
+}
+
+// groundEdgeColor は、道・プールの縁取りに使う茶色(土・石畳の縁をイメージ)。
+var groundEdgeColor = vecmath.NewVec3(0.4, 0.3, 0.18)
+
+// poolWaterColor/poolWaveColor は、プールを池らしく見せるための水面の色。
+// ベースの水色(poolWaterColor)の上に、青色の細い波線(poolWaveColor、
+// waveRibbonVertices)を何本か重ねるだけの簡易的な表現。
+var (
+	poolWaterColor = vecmath.NewVec3(0.5, 0.75, 0.82)
+	poolWaveColor  = vecmath.NewVec3(0.15, 0.42, 0.62)
+)
+
+// poolWave*は、水面に重ねる波線の形(waveRibbonVertices参照)。
+const (
+	poolWaveHalfWidth   = poolHalfWidth * 0.85
+	poolWaveAmplitude   = 0.25
+	poolWaveWavelength  = 1.3
+	poolWaveHalfThick   = 0.06
+	poolWaveSegments    = 12
+	poolWaveLineCount   = 4
+	poolWaveLineSpacing = poolHalfDepth * 1.7 / (poolWaveLineCount - 1)
+)
+
+// pathObjects は、道の板に加えて、道より一回り大きい茶色の板を下に敷いて
+// 縁取りを作る(groundEdgeBorderWidth分だけ道からはみ出させる)。
+func pathObjects(c *Context) []Object {
+	halfDepth := float32((pathNearZ - pathFarZ) / 2)
+	centerZ := float32((pathNearZ + pathFarZ) / 2)
+	transform := vecmath.Translate(vecmath.NewVec3(0, 0, float64(centerZ)))
+
+	borderVerts := quadVertices(pathHalfWidth+groundEdgeBorderWidth, halfDepth+groundEdgeBorderWidth, 0.005)
+	borderMesh := c.NewMesh(borderVerts, zeroUVs(4), quadIndices())
+	border := Object{Mesh: borderMesh, Transform: transform, Color: groundEdgeColor}
+
+	verts := quadVertices(pathHalfWidth, halfDepth, 0.01)
+	mesh := c.NewMesh(verts, zeroUVs(4), quadIndices())
+	path := Object{Mesh: mesh, Transform: transform, Color: vecmath.NewVec3(0.6, 0.55, 0.45)}
+
+	return []Object{border, path}
+}
+
+// poolObjects は、プールの縁取り(茶色、groundEdgeBorderWidth分だけ大きい板)、
+// 水面(poolWaterColor)、水面に重ねる青色の波線(poolWaveColor、
+// poolWaveLineCount本)を重ねて、池らしい見た目にする。
+func poolObjects(c *Context, offsetX float32) []Object {
+	transform := vecmath.Translate(vecmath.NewVec3(float64(offsetX), 0, poolCenterZ))
+
+	borderVerts := quadVertices(poolHalfWidth+groundEdgeBorderWidth, poolHalfDepth+groundEdgeBorderWidth, 0.005)
+	borderMesh := c.NewMesh(borderVerts, zeroUVs(4), quadIndices())
+	border := Object{Mesh: borderMesh, Transform: transform, Color: groundEdgeColor}
+
+	waterVerts := quadVertices(poolHalfWidth, poolHalfDepth, 0.01)
+	waterMesh := c.NewMesh(waterVerts, zeroUVs(4), quadIndices())
+	water := Object{Mesh: waterMesh, Transform: transform, Color: poolWaterColor}
+
+	objects := []Object{border, water}
+
+	waveVerts := waveRibbonVertices(poolWaveHalfWidth, poolWaveAmplitude, poolWaveWavelength, poolWaveHalfThick, 0.015, poolWaveSegments)
+	waveIndices := waveRibbonIndices(poolWaveSegments)
+	waveMesh := c.NewMesh(waveVerts, zeroUVs(len(waveVerts)/3), waveIndices)
+	for i := 0; i < poolWaveLineCount; i++ {
+		z := -poolHalfDepth*0.85 + float64(i)*poolWaveLineSpacing
+		waveTransform := transform.Mul(vecmath.Translate(vecmath.NewVec3(0, 0, z)))
+		objects = append(objects, Object{Mesh: waveMesh, Transform: waveTransform, Color: poolWaveColor})
+	}
+
+	return objects
+}
+
+// templeBodyObject は、Tripo3Dで生成・リメッシュ済みの建物本体+双尖塔GLB
+// (internal/assets.TempleBody)を読み込み、地面のbuildingCenterZの位置に
+// 高さbuildingTargetHeightで立つよう配置する。
+func templeBodyObject(c *Context) (Object, error) {
+	model, err := c.LoadGLBMesh(assets.TempleBody)
+	if err != nil {
+		return Object{}, err
+	}
+
+	transform := model.GroundTransform(0, buildingCenterZ, buildingTargetHeight)
+	return Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color}, nil
+}
+
+// doorObject は、隠し扉の見た目として、扉画像(internal/assets.DoorTexture、
+// CC0)を貼った板(quad)を配置する。3Dモデル自体はまだ無いプレースホルダーだが、
+// マゼンタの箱よりも「扉らしく」見えるようにしている。初期状態は全閉
+// (DoorTransform(0))。
+func doorObject(c *Context) (Object, error) {
+	texture, err := c.NewImageTexture(assets.DoorTexture, "image/png")
+	if err != nil {
+		return Object{}, err
+	}
+
+	verts := verticalQuadVertices(doorHalfWidth, doorHeight)
+	mesh := c.NewMesh(verts, quadUVsCropped(doorTextureU0, doorTextureV0, doorTextureU1, doorTextureV1), quadIndices())
+	return Object{
+		Mesh:      mesh,
+		Texture:   texture,
+		Transform: DoorTransform(0),
+		Color:     vecmath.NewVec3(1, 1, 1),
+	}, nil
+}
+
+// DoorTransform は、扉の開き具合progress(0=全閉、1=全開)に応じた配置行列を
+// 返す。扉の片端(X=doorHingeX)を蝶番としてY軸回転させることで、
+// 実際の開き戸のような動きになる。
+func DoorTransform(progress float64) vecmath.Mat4 {
+	angle := doorOpenAngleRad * progress
+
+	toHinge := vecmath.Translate(vecmath.NewVec3(doorHingeX, 0, 0))
+	fromHinge := vecmath.Translate(vecmath.NewVec3(-doorHingeX, 0, 0))
+	rotate := vecmath.RotateY(angle)
+	toWorld := vecmath.Translate(vecmath.NewVec3(0, doorHeight/2, doorCenterZ))
+
+	return toWorld.Mul(toHinge).Mul(rotate).Mul(fromHinge)
+}
+
+// linkObject は、Sketchfabのファンアートモデル(internal/assets.LinkKnight。
+// 詳細はinternal/assets/assets.goのコメント参照)を読み込み、フィールド手前の
+// スポーン地点に立つよう配置する。スキンは無くパーツごとに別メッシュ・別
+// テクスチャへ分かれているため、GanonBoss等と同様にLoadGLBParts
+// (ここではgltf.ParseParts+buildModel)/CombinedGroundTransformで読み込み、
+// パーツ数ぶんのObjectを返す。アニメーションは未実装のため静止表示のみ。
+//
+// 戻り値のlocalTransformは、ワールド座標(0, 0)に置いた場合の変換
+// (=スケール+モデル原点補正のみ)で、呼び出し側が毎フレーム位置・向きを
+// 更新する際の土台として使う。
+func linkObject(c *Context) (objs []Object, localTransform vecmath.Mat4, err error) {
+	parts, err := loadLinkParts(c)
+	if err != nil {
+		return nil, vecmath.Mat4{}, err
+	}
+
+	localTransform = CombinedGroundTransform(parts, 0, 0, linkTargetHeight)
+	transform := vecmath.Translate(vecmath.NewVec3(0, 0, linkSpawnZ)).Mul(localTransform)
+	objs = make([]Object, len(parts))
+	for i, part := range parts {
+		objs[i] = Object{Mesh: part.Mesh, Texture: part.Texture, Transform: transform, Color: part.Color}
+	}
+	return objs, localTransform, nil
+}
+
+// loadLinkParts は、internal/assets.LinkKnightをパーツごとのModelとして読み込む。
+// 神殿・草原・ガノンの3フィールドすべてのLink配置関数(linkObject/
+// grasslandLinkObject/ganonLinkObject)から共通で呼ばれる。
+func loadLinkParts(c *Context) ([]*Model, error) {
+	prims, err := gltf.ParseParts(assets.LinkKnight)
+	if err != nil {
+		return nil, err
+	}
+	parts := make([]*Model, len(prims))
+	for i := range prims {
+		model, err := c.buildModel(&prims[i])
+		if err != nil {
+			return nil, err
+		}
+		parts[i] = model
+	}
+	return parts, nil
+}
+
+// treePlacement は1本の木の配置(中心のXZ座標と目標の高さ)を表す。
+// どの木モデルを使うかは、この位置を使う側(treeObjects)で決める。
+type treePlacement struct {
+	X, Z, Height float64
+}
+
+// treePlacements は、木を「池の縁(横辺)に沿った列」と「神殿の裏側の列」の
+// 2種類だけに絞って配置する。それ以外の(参道沿い・神殿側面などの)木は
+// 意図的に置かない。見た目の再現性のため乱数シードは固定する。
+const (
+	treeMinHeight = 7.0
+	treeMaxExtra  = 4.0
+	// buildingHalfDepthMeasured は、建物本体GLB(高さbuildingTargetHeightへ
+	// スケール後)の奥行き方向の半分の実測値(bounding boxから算出、
+	// doorCenterZのコメント参照)。裏側の並木をこの分だけ建物中心から
+	// 離すことで、建物の裏に接する位置に列を作る。
+	buildingHalfDepthMeasured = 3.27
+)
+
+func treePlacements() []treePlacement {
+	rng := rand.New(rand.NewSource(7))
+	var placements []treePlacement
+
+	// 池の縁(横辺、Z方向に伸びる辺)に沿って並ぶ木。左右の池それぞれの
+	// 外側の縁(poolHalfWidthのすぐ外)から、神殿の手前(doorCenterZ付近)まで
+	// 途切れずに続けることで、手前の池と奥の神殿裏の並木との間に
+	// 木の無い区間ができないようにする。
+	const poolTreeMargin = 0.8
+	const poolTreeCount = 8
+	const poolTreeZFront = poolCenterZ + poolHalfDepth // 池の手前端(-6)
+	const poolTreeZBack = -19.0                        // 神殿の手前際まで
+	for _, side := range []float64{-1, 1} {
+		outerX := side * (poolOffsetX + poolHalfWidth + poolTreeMargin)
+		for i := 0; i < poolTreeCount; i++ {
+			t := float64(i) / float64(poolTreeCount-1)
+			z := poolTreeZFront + t*(poolTreeZBack-poolTreeZFront)
+			placements = append(placements, treePlacement{
+				X:      outerX + rng.Float64()*0.6 - 0.3,
+				Z:      z + rng.Float64()*0.6 - 0.3,
+				Height: treeMinHeight + rng.Float64()*treeMaxExtra,
+			})
+		}
+	}
+
+	// 神殿の裏側(建物の奥の壁のさらに向こう)に並ぶ木。
+	const templeBackMargin = 1.5
+	const templeBackHalfWidth = 8.0
+	const templeBackCount = 9
+	backZ := buildingCenterZ - buildingHalfDepthMeasured - templeBackMargin
+	for i := 0; i < templeBackCount; i++ {
+		t := float64(i) / float64(templeBackCount-1)
+		x := -templeBackHalfWidth + t*(templeBackHalfWidth*2)
+		placements = append(placements, treePlacement{
+			X:      x + rng.Float64() - 0.5,
+			Z:      backZ + rng.Float64()*1.5 - 0.75,
+			Height: treeMinHeight + rng.Float64()*treeMaxExtra,
+		})
+	}
+
+	return placements
+}
+
+// treeObjects は、神殿フィールド専用の木モデル(internal/assets.TempleTree、
+// Sketchfabのファンアートではなく通常のCC BY素材)を読み込み、
+// treePlacements()の配置に従って並べる。同じメッシュ・テクスチャを
+// 使い回し、Transformだけを変えて複製する(頂点データを毎回コピーしない)。
+// Sketchfabの「converted」形式で、ルートノードにZ-up→Y-up補正等の変換
+// 行列が入っているため、これを無視するLoadGLBMesh(gltf.Parse)ではなく、
+// ノードのワールド変換行列を焼き込むgltf.ParseParts経由で読み込む
+// (GanonBoss等と同じパターン。メッシュは1つだけなのでparts[0]を使う)。
+func treeObjects(c *Context) ([]Object, error) {
+	prims, err := gltf.ParseParts(assets.TempleTree)
+	if err != nil {
+		return nil, err
+	}
+	if len(prims) == 0 {
+		return nil, nil
+	}
+	model, err := c.buildModel(&prims[0])
+	if err != nil {
+		return nil, err
+	}
+
+	placements := treePlacements()
+	objects := make([]Object, 0, len(placements))
+	for _, p := range placements {
+		transform := model.GroundTransform(p.X, p.Z, p.Height)
+		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color})
+	}
+	return objects, nil
+}
+
+// templeCloudPlacement は、神殿の上空に浮かべる雲1個ぶんの配置。PartIndex
+// はinternal/assets.TempleCloud(16種類の雲メッシュ)のうちどれを使うかを
+// 指定する(gltf.ParseParts()が返す順序、見た目を確認しながら手で選んだ
+// もの)。X/Y/Zはワールド座標、Heightは目標の高さ。
+type templeCloudPlacement struct {
+	PartIndex       int
+	X, Y, Z, Height float64
+}
+
+// templeCloudPlacements は、神殿フィールドの空に浮かべる雲の配置一覧。
+// 建物(buildingCenterZ=-21、高さbuildingTargetHeight=10)の上空・奥に
+// 散らばるよう、高さ(Y)は建物の屋根より上、奥行き(Z)は手前〜奥まで
+// 散らして配置している。
+var templeCloudPlacements = []templeCloudPlacement{
+	{PartIndex: 0, X: -18, Y: 11, Z: -35, Height: 1.8},
+	{PartIndex: 3, X: 16, Y: 12.5, Z: -50, Height: 2.2},
+	{PartIndex: 5, X: -9, Y: 13.5, Z: -65, Height: 2.0},
+	{PartIndex: 8, X: 22, Y: 10.5, Z: -25, Height: 1.5},
+	{PartIndex: 11, X: 4, Y: 14.5, Z: -80, Height: 2.6},
+	{PartIndex: 14, X: -25, Y: 12, Z: -55, Height: 1.8},
+	// 画面左上が空いていたため追加(カメラに近め・高めにして左上に映るように)。
+	{PartIndex: 2, X: -38, Y: 19, Z: -30, Height: 2.2},
+	{PartIndex: 6, X: -30, Y: 22, Z: -48, Height: 2.6},
+}
+
+// templeCloudObjects は、internal/assets.TempleCloud(16種類の雲メッシュを
+// まとめたGLB)から、templeCloudPlacementsで指定した雲だけを選んで
+// 神殿フィールドの上空に配置する。スキンは無くパーツごとに別メッシュへ
+// 分かれているため、GanonBoss等と同様にgltf.ParseParts+buildModelで
+// 読み込む(GroundTransformで各雲を独立にスケール・配置するため
+// CombinedGroundTransformは使わない)。
+func templeCloudObjects(c *Context) ([]Object, error) {
+	prims, err := gltf.ParseParts(assets.TempleCloud)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]Object, 0, len(templeCloudPlacements))
+	for _, p := range templeCloudPlacements {
+		if p.PartIndex < 0 || p.PartIndex >= len(prims) {
+			continue
+		}
+		model, err := c.buildModel(&prims[p.PartIndex])
+		if err != nil {
+			return nil, err
+		}
+		localTransform := model.GroundTransform(0, 0, p.Height)
+		transform := vecmath.Translate(vecmath.NewVec3(p.X, p.Y, p.Z)).Mul(localTransform)
+		objects = append(objects, Object{Mesh: model.Mesh, Texture: model.Texture, Transform: transform, Color: model.Color})
+	}
+	return objects, nil
+}

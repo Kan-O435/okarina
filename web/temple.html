@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Okarina - 神殿フィールド</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="game-canvas" width="800" height="600"></canvas>
+
+<div id="bridge-controls">
+  <button id="btn-ping" disabled>JS→Go: goPing() を呼ぶ</button>
+  <button id="btn-midi" disabled>JS→Go: MIDIイベントを送る(テスト)</button>
+  <button id="btn-open-door" disabled>隠し扉を開ける(テスト)</button>
+</div>
+<div id="bridge-log"></div>
+
+<h3>MIDI入力</h3>
+<div id="midi-status"></div>
+
+<h3>オカリナの音</h3>
+<div id="audio-controls">
+  <button id="btn-enable-audio">音を有効にする(初回にクリック)</button>
+  <button id="btn-test-sound">テスト再生</button>
+</div>
+
+<h3>オタマトーンでLinkを移動</h3>
+<div id="mic-pitch-status">マイクは未接続です</div>
+<button id="btn-start-mic-pitch">マイクを開始</button>
+<div id="mic-pitch-info">
+  <span id="mic-pitch-value">-- Hz</span>
+  <span id="mic-direction">停止</span>
+</div>
+<div id="mic-threshold-row">
+  <label for="mic-threshold-slider">しきい値</label>
+  <input type="range" id="mic-threshold-slider" min="-60" max="-10" value="-30" step="1">
+  <span id="mic-threshold-value">-30 dB</span>
+</div>
+
+<h3>デバッグ操作</h3>
+<div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
+
+<script src="wasm_exec.js"></script>
+<script src="audio.js"></script>
+<script src="midi-input.js"></script>
+<script src="pitch.js"></script>
+<script src="mic-pitch.js"></script>
+<script src="debug-keys.js"></script>
+<script src="main.js"></script>
+
+</body>
+</html>

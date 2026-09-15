@@ -1,0 +1,38 @@
+Ocarina of Time Link
+
+Author: projectmgame (https://sketchfab.com/projectmgame)
+Source: https://sketchfab.com/3d-models/ocarina-of-time-link-c62717add333410987482d44959e56c7
+
+License: Creative Commons Attribution (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution:
+"Ocarina of Time Link" by projectmgame is licensed under
+Creative Commons Attribution.
+
+---
+
+IMPORTANT NOTE ON SCOPE OF THIS LICENSE:
+
+This is a fan-made recreation of Nintendo's Link character design from
+"The Legend of Zelda: Ocarina of Time" (originally made as an alternate
+costume for Link in the Super Smash Bros. Brawl mod "Project M"). The
+author's CC BY 4.0 license covers their own modeling/texturing/rigging
+work; it does NOT extend to, waive, or license Nintendo's copyright/
+trademark rights in the underlying character design and likeness.
+Nintendo has not authorized this derivative work or its use here.
+
+This asset is used at the explicit request of the project owner, made
+with full awareness of this risk (same category of tradeoff as
+internal/assets/models/ganon-boss.glb and ganon-boss-battle.glb — see
+sketchfab-totidoki-ganon-CC-BY.txt), in place of the previously-used
+original-design stand-in (KayKit Adventurers "Knight", CC0). If this
+project is ever distributed publicly or commercially, this asset should
+be reconsidered.
+
+Used as internal/assets/models/link-knight.glb (internal/assets.LinkKnight),
+the shared Link model for all three fields (temple/demo, grassland,
+ganon-battle/ganon-hall). Like the Ganon assets, it is Sketchfab's
+"converted" GLB export with no skin (12 body-part meshes, no bones), so
+it is loaded with gltf.ParseParts/CombinedGroundTransform rather than
+LoadSkinnedGLBMesh (see internal/renderer/demo.go's linkObject).

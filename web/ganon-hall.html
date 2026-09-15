@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Okarina - ガノンフィールド(玉座の間)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="game-canvas" width="800" height="600"></canvas>
+
+<p style="font-size: 13px; color: #aaa;">
+  ガノンフィールド(玉座の間案)。<br>
+  <a href="grassland.html" style="color: #7CFC9A;">草原フィールドに戻る</a> /
+  <a href="ganon-battle.html" style="color: #7CFC9A;">戦場跡案を見る</a>
+</p>
+
+<h3>MIDI入力</h3>
+<div id="midi-status"></div>
+
+<h3>オカリナの音</h3>
+<div id="audio-controls">
+  <button id="btn-enable-audio">音を有効にする(初回にクリック)</button>
+  <button id="btn-test-sound">テスト再生</button>
+</div>
+
+<h3>オタマトーンでLinkを移動</h3>
+<div id="mic-pitch-status">マイクは未接続です</div>
+<button id="btn-start-mic-pitch">マイクを開始</button>
+<div id="mic-pitch-info">
+  <span id="mic-pitch-value">-- Hz</span>
+  <span id="mic-direction">停止</span>
+</div>
+<div id="mic-threshold-row">
+  <label for="mic-threshold-slider">しきい値</label>
+  <input type="range" id="mic-threshold-slider" min="-60" max="-10" value="-30" step="1">
+  <span id="mic-threshold-value">-30 dB</span>
+</div>
+
+<h3>デバッグ操作</h3>
+<div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
+<button id="btn-defeat-ganon">ガノン(第一形態)を倒した(テスト)</button>
+<button id="btn-preview-collapse">崩落演出をテスト再生</button>
+
+<script src="wasm_exec.js"></script>
+<script src="audio.js"></script>
+<script src="midi-input.js"></script>
+<script src="pitch.js"></script>
+<script src="mic-pitch.js"></script>
+<script src="debug-keys.js"></script>
+<script src="ganon-hall.js"></script>
+<script>
+  // 「特定の演奏でGanonの第一形態を倒す」処理はまだ無いため、動作確認用の
+  // ボタンから直接goDefeatGanonFirstForm()を呼ぶ仮実装(btn-open-doorと同様)。
+  document.getElementById('btn-defeat-ganon').addEventListener('click', () => {
+    window.goDefeatGanonFirstForm();
+  });
+
+  // 崩落演出(岩が降ってくる+wipe岩が画面を覆う)だけを、戦場跡フィールド
+  // への遷移なしでその場で試せるプレビューボタン。何度でも押して確認できる。
+  document.getElementById('btn-preview-collapse').addEventListener('click', () => {
+    window.goPreviewGanonHallCollapse();
+  });
+</script>
+
+</body>
+</html>
