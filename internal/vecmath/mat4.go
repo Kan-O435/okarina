@@ -110,6 +110,20 @@ func Perspective(fovYRad, aspect, near, far float64) Mat4 {
 	return m
 }
 
+// Ortho は平行投影(正射影)行列を返す。遠近感を付けたくない描画
+// (HUDなど、スクリーン座標にそのまま貼り付ける2D要素)に使う。
+// left/right/bottom/topは描画範囲、near/farはZ範囲。
+func Ortho(left, right, bottom, top, near, far float64) Mat4 {
+	m := Identity()
+	m[0] = 2 / (right - left)
+	m[5] = 2 / (top - bottom)
+	m[10] = -2 / (far - near)
+	m[12] = -(right + left) / (right - left)
+	m[13] = -(top + bottom) / (top - bottom)
+	m[14] = -(far + near) / (far - near)
+	return m
+}
+
 // LookAt はeye(カメラ位置)からtarget(注視点)を見るビュー行列を返す。upは上方向。
 func LookAt(eye, target, up Vec3) Mat4 {
 	zAxis := eye.Sub(target).Normalize()

@@ -22,6 +22,9 @@ func (c *Context) Clear() {}
 // EnableDepthTest はネイティブビルドでは何もしない。
 func (c *Context) EnableDepthTest() {}
 
+// DisableDepthTest はネイティブビルドでは何もしない。
+func (c *Context) DisableDepthTest() {}
+
 // EnableBlend はネイティブビルドでは何もしない。
 func (c *Context) EnableBlend() {}
 

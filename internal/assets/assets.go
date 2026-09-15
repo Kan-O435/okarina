@@ -24,6 +24,13 @@ var Trees embed.FS
 //go:embed textures/door.png
 var DoorTexture []byte
 
+// SongOfTimeSheetTexture は、「時の歌」(ラ→レ→ファ→ラ→レ→ファ)の楽譜を
+// 表すバナー画像(背景透過PNG、ChatGPT生成)。ゲーム画面のHUDとして
+// 常時オーバーレイ表示する(internal/renderer.BuildSongSheetHUD参照)。
+//
+//go:embed textures/song-of-time-sheet.png
+var SongOfTimeSheetTexture []byte
+
 // GrasslandCastle は、草原フィールドの道の先に置く「白い城」のGLB
 // (Tripo3Dで生成・リメッシュ済み、テクスチャ無しの単色モデル)。
 //

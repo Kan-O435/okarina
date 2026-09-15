@@ -58,6 +58,12 @@ func (c *Context) EnableDepthTest() {
 	c.gl.Call("enable", glDepthTest)
 }
 
+// DisableDepthTest は深度テストを無効にする。HUDのような、3Dシーンより
+// 必ず手前に(奥行きを無視して)描画したい要素を描く前に呼ぶ。
+func (c *Context) DisableDepthTest() {
+	c.gl.Call("disable", glDepthTest)
+}
+
 // EnableBlend はアルファブレンディングを有効にする。
 // 扉画像のような、背景が透過(アルファ<1)なテクスチャを正しく合成するために使う。
 func (c *Context) EnableBlend() {
