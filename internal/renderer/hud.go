@@ -13,6 +13,10 @@ const songSheetAspect = 2016.0 / 780.0
 // バナー)の横:縦比。
 const horseSongSheetAspect = 1600.0 / 619.0
 
+// ganonHallMelodySheetAspect は「光のプレリュード」楽譜画像
+// (1600x620px、ユーザー提供のバナー)の横:縦比。
+const ganonHallMelodySheetAspect = 1600.0 / 620.0
+
 // HUD は、3Dシーンとは独立してスクリーン座標(ピクセル、Y下向き)に固定
 // 表示する2Dオーバーレイ(時の歌・馬の歌の楽譜など)を描画するための
 // 最小限の仕組み。
@@ -34,6 +38,13 @@ func BuildSongSheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
 // (Context.CanvasSize())。
 func BuildHorseSongSheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
 	return buildImageHUD(c, assets.HorseSongSheetTexture, horseSongSheetAspect, widthPx, heightPx)
+}
+
+// BuildGanonHallMelodySheetHUD は「光のプレリュード」の楽譜バナーを、
+// canvas上部中央に配置するHUDとして組み立てる。widthPx/heightPxはcanvas
+// の実サイズ(Context.CanvasSize())。
+func BuildGanonHallMelodySheetHUD(c *Context, widthPx, heightPx int) (*HUD, error) {
+	return buildImageHUD(c, assets.GanonHallMelodySheetTexture, ganonHallMelodySheetAspect, widthPx, heightPx)
 }
 
 // buildImageHUD は、背景透過PNG(textureData)をcanvas上部中央に配置する

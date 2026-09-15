@@ -17,6 +17,10 @@ const SongOfTimeName = "SONG_OF_TIME"
 // この合図(レ→シ→ラ→レ→シ→ラ)を演奏すると馬が呼び出される。
 const HorseSongName = "HORSE_SONG"
 
+// GanonHallMelodyName は、玉座の間でGanonの第一形態を倒す合図のPattern名。
+// 本家ゼルダの「光のプレリュード」(レ→ラ→レ→ラ→シ→レ)を使っている。
+const GanonHallMelodyName = "GANON_HALL_MELODY"
+
 // DefaultPatterns はゲームで使用する魔法の旋律の定義一覧(MVP)。
 var DefaultPatterns = []Pattern{
 	{Name: "SUN_MELODY", Pitches: []Pitch{C, D, E, G}},
@@ -26,6 +30,8 @@ var DefaultPatterns = []Pattern{
 	{Name: SongOfTimeName, Pitches: []Pitch{A, D, F, A, D, F}},
 	// 馬の歌(演奏で認識させる合図): レ→シ→ラ→レ→シ→ラ
 	{Name: HorseSongName, Pitches: []Pitch{D, B, A, D, B, A}},
+	// 光のプレリュード(演奏で認識させる合図): レ→ラ→レ→ラ→シ→レ
+	{Name: GanonHallMelodyName, Pitches: []Pitch{D, A, D, A, B, D}},
 }
 
 // ContinuationNote は、自動再生する曲の1音を表す。演奏判定に使うPitch

@@ -298,10 +298,21 @@ func HorseSongPlayed() bool {
 	return horseSongPlayed
 }
 
+// ganonHallMelodyPlayed は、玉座の間の合図(music.GanonHallMelodyName)が
+// 正しく演奏されたことを示す。
+var ganonHallMelodyPlayed bool
+
+// GanonHallMelodyPlayed は、玉座の間の合図が正しく演奏されたかどうかを
+// 返す。
+func GanonHallMelodyPlayed() bool {
+	return ganonHallMelodyPlayed
+}
+
 // audioHooksMu は、下のplayNoteHook・stopNoteHook・playConfirmationFanfareHook・
-// playHorseJumpSoundHook・sleepHookへの読み書きを保護する。onMelodyRecorded
-// はgoroutineを起動して非同期に曲の続きを再生するため、bridge.Init()での
-// 差し込みやテストでの差し替えと同時に読まれても安全なようにしている。
+// playHorseJumpSoundHook・playGanonHallCollapseSoundHook・sleepHookへの
+// 読み書きを保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の
+// 続きを再生するため、bridge.Init()での差し込みやテストでの差し替えと
+// 同時に読まれても安全なようにしている。
 var audioHooksMu sync.Mutex
 
 // playNoteHook・stopNoteHook は、Goから直接ブラウザの音声再生(Web Audio
@@ -310,14 +321,18 @@ var audioHooksMu sync.Mutex
 // web/audio.jsのplayConfirmationFanfare)を再生するためのフック。
 // playHorseJumpSoundHookは、馬がジャンプした際のいななき効果音
 // (web/grassland.jsのplayHorseJumpSound)を再生するためのフック。
-// bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未初期化時は
-// nilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
+// playGanonHallCollapseSoundHookは、玉座の間の崩落演出が始まった際の
+// 効果音(web/ganon-hall.jsのplayGanonHallCollapseSound)を再生するための
+// フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未
+// 初期化時はnilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち
+// 時間を省略する)。
 var (
-	playNoteHook                func(note, velocity int)
-	stopNoteHook                func(note int)
-	playConfirmationFanfareHook func()
-	playHorseJumpSoundHook      func()
-	sleepHook                   = time.Sleep
+	playNoteHook                   func(note, velocity int)
+	stopNoteHook                   func(note int)
+	playConfirmationFanfareHook    func()
+	playHorseJumpSoundHook         func()
+	playGanonHallCollapseSoundHook func()
+	sleepHook                      = time.Sleep
 )
 
 // SetPlayNoteFunc は、Goから曲を自動再生する際に使う「1音鳴らす」実装を
@@ -366,6 +381,27 @@ func PlayHorseJumpSound() {
 	}
 }
 
+// SetPlayGanonHallCollapseSoundFunc は、玉座の間の崩落演出が始まった際の
+// 効果音を再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayGanonHallCollapseSoundFunc(f func()) {
+	audioHooksMu.Lock()
+	playGanonHallCollapseSoundHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayGanonHallCollapseSound は、玉座の間の崩落演出(岩が降り始める瞬間)
+// の効果音(mp3、web/assets/audio/ganon-hall-collapse.mp3)を再生する。
+// cmd/ganon-hall/main.goが、崩落演出の開始時に呼ぶ想定。フックが未登録
+// (ネイティブビルドやJS未初期化時)の場合は何もしない。
+func PlayGanonHallCollapseSound() {
+	audioHooksMu.Lock()
+	play := playGanonHallCollapseSoundHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
+}
+
 // onMelodyRecorded は一連の演奏が確定した際に呼ばれ、登録済みの旋律
 // パターンと照合する。扉のメロディ(DOOR_MELODY)または時の歌
 // (music.SongOfTimeName)が演奏された場合、doorOpenDelayだけ「ため」て
@@ -374,6 +410,10 @@ func PlayHorseJumpSound() {
 // (SongOfTimeOpening→SongOfTimeContinuation)も行う。馬の歌
 // (music.HorseSongName)が演奏された場合は、確認音→続き(HorseSongContinuation)
 // の再生に合わせて馬を呼び出す(SetHorseSummonerで登録された関数を呼ぶ)。
+// 玉座の間の合図(music.GanonHallMelodyName)が演奏された場合は、確認音
+// (「テレレレレ」)を鳴らした後、崩落演出を開始する
+// (TriggerGanonHallCollapse、玉座の間フィールド以外では登録済み
+// トリガーが無いため何も起きない)。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -400,6 +440,11 @@ func onMelodyRecorded(melody music.Melody) {
 		if horseSummoner != nil {
 			horseSummoner()
 		}
+	}
+
+	if name == music.GanonHallMelodyName {
+		ganonHallMelodyPlayed = true
+		go playGanonHallMelodyAudio()
 	}
 }
 
@@ -436,6 +481,21 @@ func playHorseSongAudio() {
 	playConfirmationFanfare(fanfare, sleep)
 	sleep(music.SongOfTimePauseDur)
 	playNotes(play, stop, sleep, music.HorseSongContinuation)
+}
+
+// playGanonHallMelodyAudio は、プレイヤーが光のプレリュード(玉座の間の
+// 合図)を演奏した後、確認音(「テレレレレ」、時の歌・馬の歌と共用)を
+// 鳴らしてから崩落演出を開始する(TriggerGanonHallCollapse。演出の中で、
+// 岩が降り始める瞬間に別の効果音が鳴る、cmd/ganon-hall/main.go参照)。
+// 確認音の再生用フックが未登録(ネイティブビルドやJS未初期化時)の場合は
+// 確認音を待たずに崩落演出を開始する。
+func playGanonHallMelodyAudio() {
+	audioHooksMu.Lock()
+	sleep, fanfare := sleepHook, playConfirmationFanfareHook
+	audioHooksMu.Unlock()
+
+	playConfirmationFanfare(fanfare, sleep)
+	TriggerGanonHallCollapse()
 }
 
 // playConfirmationFanfare は、時の歌・馬の歌を正しく演奏した際の確認音
