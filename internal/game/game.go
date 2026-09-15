@@ -173,10 +173,9 @@ func TriggerGanonHallCollapsePreview() {
 // ganonBattleDefeatTrigger は、戦場跡フィールドでGanonの最終形態を倒した際の
 // 演出(嵐→雷→爆発→白フェード→エンディングページへの遷移)を開始する関数。
 // cmd/ganon-battle/main.goが起動時に登録する(ganonHallCollapseTriggerと
-// 同様のコールバックパターン)。「特定の演奏で倒す」メロディ判定はまだ
-// 無いため、現時点ではデバッグボタン(bridge.goのgoDefeatGanonFinalForm)
-// から直接呼ばれる想定。メロディが実装された際は、onMelodyRecorded側から
-// このTriggerGanonBattleDefeat()を呼ぶだけで配線できる。
+// 同様のコールバックパターン)。onMelodyRecordedが嵐の歌(music.
+// GanonBattleMelodyName)を認識した際に、確認音・BGMの再生後にこの
+// TriggerGanonBattleDefeat()を呼ぶ。
 var ganonBattleDefeatTrigger func()
 
 // SetGanonBattleDefeatTrigger は、戦場跡フィールドのGanon最終形態撃破演出を
@@ -362,6 +361,16 @@ func GanonHallMelodyPlayed() bool {
 	return ganonHallMelodyPlayed
 }
 
+// ganonBattleMelodyPlayed は、戦場跡の合図(music.GanonBattleMelodyName)が
+// 正しく演奏されたことを示す。
+var ganonBattleMelodyPlayed bool
+
+// GanonBattleMelodyPlayed は、戦場跡の合図が正しく演奏されたかどうかを
+// 返す。
+func GanonBattleMelodyPlayed() bool {
+	return ganonBattleMelodyPlayed
+}
+
 // audioHooksMu は、下のplayNoteHook・stopNoteHook・playConfirmationFanfareHook・
 // playHorseJumpSoundHook・playGanonHallCollapseSoundHook・sleepHookへの
 // 読み書きを保護する。onMelodyRecordedはgoroutineを起動して非同期に曲の
@@ -377,15 +386,19 @@ var audioHooksMu sync.Mutex
 // (web/grassland.jsのplayHorseJumpSound)を再生するためのフック。
 // playGanonHallCollapseSoundHookは、玉座の間の崩落演出が始まった際の
 // 効果音(web/ganon-hall.jsのplayGanonHallCollapseSound)を再生するための
-// フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS未
-// 初期化時はnilのまま。sleepHookはtime.Sleepの差し替え用(テストで待ち
-// 時間を省略する)。
+// フック。playGanonBattleSongHookは、嵐の歌を正しく演奏した後に流す本家の
+// BGM(web/ganon-battle.jsのplayGanonBattleSongOfStorms)を再生するための
+// フック。playGanonBattleThunderHookは、Ganon最終形態撃破演出中の雷鳴
+// (web/ganon-battle.jsで合成)を再生するためのフック。bridge.Init()がJS
+// 側の実装を差し込む。ネイティブビルドやJS未初期化時はnilのまま。
+// sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
 var (
 	playNoteHook                   func(note, velocity int)
 	stopNoteHook                   func(note int)
 	playConfirmationFanfareHook    func()
 	playHorseJumpSoundHook         func()
 	playGanonHallCollapseSoundHook func()
+	playGanonBattleSongHook        func()
 	playGanonBattleThunderHook     func()
 	sleepHook                      = time.Sleep
 )
@@ -457,6 +470,14 @@ func PlayGanonHallCollapseSound() {
 	}
 }
 
+// SetPlayGanonBattleSongFunc は、嵐の歌を正しく演奏した後に流す本家の
+// BGMを再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayGanonBattleSongFunc(f func()) {
+	audioHooksMu.Lock()
+	playGanonBattleSongHook = f
+	audioHooksMu.Unlock()
+}
+
 // SetPlayGanonBattleThunderSoundFunc は、戦場跡フィールドのGanon最終形態
 // 撃破演出で雷が落ちた瞬間の雷鳴を再生する実装を登録する(bridge.Init()
 // から呼ばれる)。
@@ -491,7 +512,10 @@ func PlayGanonBattleThunderSound() {
 // 玉座の間の合図(music.GanonHallMelodyName)が演奏された場合は、確認音
 // (「テレレレレ」)を鳴らした後、崩落演出を開始する
 // (TriggerGanonHallCollapse、玉座の間フィールド以外では登録済み
-// トリガーが無いため何も起きない)。
+// トリガーが無いため何も起きない)。戦場跡の合図(music.
+// GanonBattleMelodyName、嵐の歌)が演奏された場合は、確認音→本家のBGM
+// (嵐の歌)を鳴らした後、撃破演出を開始する(TriggerGanonBattleDefeat。
+// 撃破演出自体はまだ無いため、登録されるまでは何も起きない)。
 func onMelodyRecorded(melody music.Melody) {
 	fmt.Printf("[music] melody recorded: %v\n", melody.Pitches())
 
@@ -519,6 +543,11 @@ func onMelodyRecorded(melody music.Melody) {
 	if name == music.GanonHallMelodyName {
 		ganonHallMelodyPlayed = true
 		go playGanonHallMelodyAudio()
+	}
+
+	if name == music.GanonBattleMelodyName {
+		ganonBattleMelodyPlayed = true
+		go playGanonBattleMelodyAudio()
 	}
 }
 
@@ -579,6 +608,23 @@ func playGanonHallMelodyAudio() {
 func DebugTriggerGanonHallMelody() {
 	ganonHallMelodyPlayed = true
 	go playGanonHallMelodyAudio()
+}
+
+// playGanonBattleMelodyAudio は、プレイヤーが嵐の歌(戦場跡の合図)を
+// 演奏した後、確認音(「テレレレレ」)→本家のBGM(嵐の歌)を鳴らしてから
+// 撃破演出を開始する(TriggerGanonBattleDefeat)。BGMの再生用フックが
+// 未登録の場合はBGMを待たずに撃破演出を開始する。
+func playGanonBattleMelodyAudio() {
+	audioHooksMu.Lock()
+	sleep, fanfare, song := sleepHook, playConfirmationFanfareHook, playGanonBattleSongHook
+	audioHooksMu.Unlock()
+
+	playConfirmationFanfare(fanfare, sleep)
+	if song != nil {
+		song()
+		sleep(music.GanonBattleSongDuration)
+	}
+	TriggerGanonBattleDefeat()
 }
 
 // playConfirmationFanfare は、時の歌・馬の歌を正しく演奏した際の確認音

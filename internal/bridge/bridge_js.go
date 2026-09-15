@@ -32,13 +32,15 @@ func Init() {
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
 	// playGanonHallCollapseSound、web/ganon-battle.jsの
-	// playGanonBattleThunderSound)の実装をgameパッケージに差し込む。
-	// これにより、Goから「時の歌」の続きや効果音などを自動再生できる。
+	// playGanonBattleSongOfStorms/playGanonBattleThunderSound)の実装を
+	// gameパッケージに差し込む。これにより、Goから「時の歌」の続きや
+	// 効果音などを自動再生できる。
 	game.SetPlayNoteFunc(callPlayNote)
 	game.SetStopNoteFunc(callStopNote)
 	game.SetPlayConfirmationFanfareFunc(callPlayConfirmationFanfare)
 	game.SetPlayHorseJumpSoundFunc(callPlayHorseJumpSound)
 	game.SetPlayGanonHallCollapseSoundFunc(callPlayGanonHallCollapseSound)
+	game.SetPlayGanonBattleSongFunc(callPlayGanonBattleSong)
 	game.SetPlayGanonBattleThunderSoundFunc(callPlayGanonBattleThunderSound)
 }
 
@@ -71,6 +73,13 @@ func callPlayHorseJumpSound() {
 // 際の効果音を再生する(web/ganon-hall.js、玉座の間のみで定義される)。
 func callPlayGanonHallCollapseSound() {
 	js.Global().Call("playGanonHallCollapseSound")
+}
+
+// callPlayGanonBattleSong はGoからJavaScript側の
+// playGanonBattleSongOfStorms()を呼び出し、嵐の歌を正しく演奏した後に
+// 流す本家のBGMを再生する(web/ganon-battle.js、戦場跡のみで定義される)。
+func callPlayGanonBattleSong() {
+	js.Global().Call("playGanonBattleSongOfStorms")
 }
 
 // callPlayGanonBattleThunderSound はGoからJavaScript側の

@@ -27,6 +27,11 @@ var ganonHallMelody = music.Melody{
 	{Pitch: music.A}, {Pitch: music.B}, {Pitch: music.D},
 }
 
+var ganonBattleMelody = music.Melody{
+	{Pitch: music.D}, {Pitch: music.F}, {Pitch: music.D},
+	{Pitch: music.D}, {Pitch: music.F}, {Pitch: music.D},
+}
+
 func TestOnMelodyRecorded_SongOfTimeCorrect(t *testing.T) {
 	songOfTimePlayed = false
 
@@ -281,6 +286,62 @@ func TestOnMelodyRecorded_GanonHallMelodyWithNoTriggerRegisteredDoesNothing(t *t
 
 	if !GanonHallMelodyPlayed() {
 		t.Fatal("expected GanonHallMelodyPlayed() to still be set even without a registered trigger")
+	}
+}
+
+func TestOnMelodyRecorded_GanonBattleMelodyCorrect(t *testing.T) {
+	ganonBattleMelodyPlayed = false
+	SetGanonBattleDefeatTrigger(func() {})
+	defer SetGanonBattleDefeatTrigger(nil)
+
+	onMelodyRecorded(ganonBattleMelody)
+
+	if !GanonBattleMelodyPlayed() {
+		t.Fatal("expected GanonBattleMelodyPlayed() to be true after playing レファレレファレ correctly")
+	}
+}
+
+func TestOnMelodyRecorded_GanonBattleMelodyPlaysConfirmationThenSongThenTriggersDefeat(t *testing.T) {
+	ganonBattleMelodyPlayed = false
+	defer setSleepHookForTest(func(time.Duration) {})()
+
+	fanfareCalls, songCalls := 0, 0
+	done := make(chan struct{})
+	SetPlayConfirmationFanfareFunc(func() { fanfareCalls++ })
+	SetPlayGanonBattleSongFunc(func() { songCalls++ })
+	SetGanonBattleDefeatTrigger(func() { close(done) })
+	defer func() {
+		SetPlayConfirmationFanfareFunc(nil)
+		SetPlayGanonBattleSongFunc(nil)
+		SetGanonBattleDefeatTrigger(nil)
+	}()
+
+	onMelodyRecorded(ganonBattleMelody)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("ganon battle defeat trigger was not called within timeout")
+	}
+
+	if fanfareCalls != 1 {
+		t.Fatalf("expected the confirmation fanfare to be played once, got %d calls", fanfareCalls)
+	}
+	if songCalls != 1 {
+		t.Fatalf("expected the song of storms BGM to be played once, got %d calls", songCalls)
+	}
+}
+
+func TestOnMelodyRecorded_GanonBattleMelodyWithNoTriggerRegisteredDoesNothing(t *testing.T) {
+	ganonBattleMelodyPlayed = false
+	defer setSleepHookForTest(func(time.Duration) {})()
+	SetGanonBattleDefeatTrigger(nil)
+	SetPlayGanonBattleSongFunc(nil)
+
+	onMelodyRecorded(ganonBattleMelody) // パニックしないことを確認する
+
+	if !GanonBattleMelodyPlayed() {
+		t.Fatal("expected GanonBattleMelodyPlayed() to still be set even without a registered trigger")
 	}
 }
 
