@@ -8,6 +8,19 @@ import "embed"
 //go:embed models/temple-body.glb
 var TempleBody []byte
 
+// LinkKnight は、3フィールド(神殿/草原/ガノン)共通で使うプレイヤーキャラクター
+// LinkのGLB。もとはKayKit Adventurers(CC0)のKnightモデルだったが、Sketchfabの
+// ファンアートモデル「Ocarina of Time Link」(作者: projectmgame、CC
+// Attribution、https://sketchfab.com/3d-models/ocarina-of-time-link-c62717add333410987482d44959e56c7、
+// 元はSuper Smash Bros. Brawl改造版「Project M」のLinkの代替コスチューム)に
+// 差し替えている。GanonBoss/GanonBossBattleと同じく任天堂の実際のLinkの
+// デザインをそのまま再現したファンアートであり、リスクを理解した上で
+// ユーザーの指示により採用している。詳細は
+// docs/licenses/sketchfab-projectmgame-link-CC-BY.txt参照。スキンは無く、
+// パーツごとに別メッシュ・別テクスチャへ分かれているため、GanonBoss等と同じ
+// LoadGLBParts/CombinedGroundTransformで読み込む(internal/renderer/demo.goの
+// linkObject参照)。
+//
 //go:embed models/link-knight.glb
 var LinkKnight []byte
 
@@ -63,15 +76,34 @@ var GanonBattleScene []byte
 //go:embed models/ganon-hall.glb
 var GanonHall []byte
 
-// GanonBoss は、ガノンフィールドの背景の手前に配置するボス役のGLB
-// (CC0、KayKit Adventurers Character PackのBarbarianモデルを流用)。
-// 任天堂の実際のガノンドロフのデザインをそのまま模倣することは避け、
-// 「着想を得た」大柄で威圧的なキャラクターとして、体パーツごとに分かれた
-// スキン付きモデル(LinkKnightと同じ構造)をそのまま使う
-// (internal/renderer/ganon.goのganonBossObject、LoadSkinnedGLBMesh参照)。
+// GanonBoss は、玉座の間案(GanonBackgroundHall)の背景の手前に配置する
+// ボス役のGLB。Sketchfabのファンアートモデル「Zelda Ocarina of time Fan
+// Art: Ganon」(作者: totidoki、CC Attribution、
+// https://sketchfab.com/3d-models/zelda-ocarina-of-time-fan-art-ganon-868ad08b11e245078410ae8aa70a7068)の
+// 「converted」形式(609KB、人型のガノンドロフ姿)。これは任天堂の実際の
+// ガノン(時のオカリナ)のデザインをそのまま再現したものであり、以前
+// 使っていたKayKit Barbarian(着想を得たオリジナルデザイン)とは異なり、
+// 任天堂の知的財産権に関するリスクを理解した上でユーザーの指示により
+// 採用している。詳細はdocs/licenses/sketchfab-totidoki-ganon-CC-BY.txt
+// 参照。スキンは無く、パーツごとに別メッシュ・別テクスチャへ分かれて
+// いるため、LoadGLBParts/CombinedGroundTransformで読み込む
+// (internal/renderer/ganon.goのganonBossObject参照)。
 //
 //go:embed models/ganon-boss.glb
 var GanonBoss []byte
+
+// GanonBossBattle は、戦場跡案(GanonBackgroundBattle)の背景の手前に
+// 配置するボス役のGLB。同じSketchfabモデルの、作者のオリジナルFBXから
+// 変換したより高品質な版(緑色・角のある獣形態のガノン)。元のテクスチャは
+// 4096px等の非圧縮PNGで合計約66MBあったため、1024px以下・JPEG(quality
+// 80程度)に圧縮して約3.8MBまで削減している(このエンジンはbaseColor
+// Textureしか読まないため、法線・金属度等のテクスチャも同様に圧縮して
+// いるが実際には使われない)。GanonBossとはバウンディングボックスの
+// 縦横比が大きく異なる別モデルのため、専用のganonBossBattleZ/Y/Height
+// で配置する。
+//
+//go:embed models/ganon-boss-battle.glb
+var GanonBossBattle []byte
 
 // Horse は、草原フィールドで「馬の歌」を演奏すると呼び出される馬のGLB
 // (CC0、Quaternius "Ultimate Animated Animal Pack"、docs/assets/horse/

@@ -1,0 +1,42 @@
+Zelda Ocarina of time Fan Art: Ganon
+
+Author: totidoki (https://sketchfab.com/totidoki)
+Source: https://sketchfab.com/3d-models/zelda-ocarina-of-time-fan-art-ganon-868ad08b11e245078410ae8aa70a7068
+
+License: Creative Commons Attribution (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Attribution:
+"Zelda Ocarina of time Fan Art: Ganon" by totidoki is licensed under
+Creative Commons Attribution.
+
+---
+
+IMPORTANT NOTE ON SCOPE OF THIS LICENSE:
+
+This is a fan-art recreation of Nintendo's Ganon character design from
+"The Legend of Zelda: Ocarina of Time." The author's CC BY 4.0 license
+covers their own modeling/texturing work; it does NOT extend to, waive,
+or license Nintendo's copyright/trademark rights in the underlying
+character design and likeness. Nintendo has not authorized this
+derivative work or its use here.
+
+This asset is used at the explicit request of the project owner, made
+with full awareness of this risk, in place of the previously-used
+original-design stand-in (KayKit Adventurers "Barbarian", CC0 — see
+kaykit-adventurers-CC0.txt). If this project is ever distributed
+publicly or commercially, this asset should be reconsidered.
+
+Two files derived from this same Sketchfab model are used:
+
+- internal/assets/models/ganon-boss.glb (humanoid Ganondorf form) —
+  Sketchfab's "converted" glTF export, used for the throne-room field
+  (cmd/ganon-hall).
+- internal/assets/models/ganon-boss-battle.glb (green, horned beast
+  form) — converted from the author's original FBX, with all embedded
+  textures downscaled to <=1024px and re-encoded as JPEG (originally
+  ~66MB of uncompressed PNGs, some 4096px) to keep the compiled game a
+  reasonable size; only baseColorTexture is used by this project's
+  renderer, so normal/metallic-roughness/emissive textures were
+  compressed too even though they're not read. Used for the battle-scene
+  field (cmd/ganon-battle).
