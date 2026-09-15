@@ -226,10 +226,28 @@ func SetDebugDirection(direction string) {
 	player.Player.SetDirection(d)
 }
 
+// titleStartTrigger は、タイトル画面で「ド(C)」が弾かれた際に呼ばれる
+// 関数。cmd/title/main.goが起動時に登録する(horseSummoner等と同様の
+// コールバックパターン)。タイトル画面以外のページでは未登録のまま。
+var titleStartTrigger func()
+
+// SetTitleStartTrigger は、タイトル画面の開始トリガーとして呼び出す関数を
+// 登録する。
+func SetTitleStartTrigger(f func()) {
+	titleStartTrigger = f
+}
+
 // OnMIDIEvent はJS-Go Bridge経由で受け取ったMIDIイベントを
-// 旋律記録エンジン(internal/music.Recorder)に渡す。
+// 旋律記録エンジン(internal/music.Recorder)に渡す。あわせて、タイトル
+// 画面用に「ド(C、オクターブ不問)のNote On」を即座に検出する
+// (旋律認識は無音のタイムアウトを待ってから確定するため、単音への
+// 即時反応にはrecorderとは別にここでチェックする)。
 func OnMIDIEvent(e midi.Event) {
 	recorder.HandleEvent(e)
+
+	if e.IsNoteOn && titleStartTrigger != nil && music.PitchFromMIDINote(e.Note) == music.C {
+		titleStartTrigger()
+	}
 }
 
 // songOfTimePlayed は、時の歌(music.SongOfTimeName)が正しく演奏された
