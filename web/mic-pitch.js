@@ -57,7 +57,10 @@ function micPitchFrame(timestamp) {
   requestAnimationFrame(micPitchFrame);
 }
 
-btnStartMicPitch.addEventListener('click', async () => {
+// startMicPitch は、マイクの取得〜ピッチ検出ループの開始までを行う。
+// ボタンクリック(手動)からも、ページ読み込み時の自動開始(下記)からも
+// 呼べるよう関数として切り出している。
+async function startMicPitch() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     micPitchStatusEl.textContent = 'このブラウザはマイク入力に対応していません';
     return;
@@ -78,4 +81,28 @@ btnStartMicPitch.addEventListener('click', async () => {
   } catch (err) {
     micPitchStatusEl.textContent = 'マイクの取得に失敗しました: ' + err;
   }
-});
+}
+
+btnStartMicPitch.addEventListener('click', startMicPitch);
+
+// このオリジン(同じホスト・ポート)へのマイクアクセスをブラウザがすでに
+// 「許可」済みの場合、ページ遷移のたびに手動でボタンを押さなくても
+// 自動的にマイク入力を開始する。ブラウザの許可自体はオリジン単位で
+// 記憶されるため本来ページ遷移のたびに聞かれ直すことは無いはずだが、
+// (ローカル開発でポート番号が毎回変わっている場合はオリジンが変わって
+// しまい許可が引き継がれない点に注意)、少なくともこちら側で「毎回
+// ボタンを押す」手間は無くすためのもの。Permissions APIの'microphone'に
+// 対応していないブラウザ(Safari等)では何もせず、従来通りボタンでの
+// 開始のみをサポートする。
+if (navigator.permissions && navigator.permissions.query) {
+  navigator.permissions.query({ name: 'microphone' })
+    .then((status) => {
+      if (status.state === 'granted') {
+        startMicPitch();
+      }
+    })
+    .catch(() => {
+      // 'microphone'照会に対応していない場合はここに来る。ボタンでの
+      // 手動開始にフォールバックする。
+    });
+}
