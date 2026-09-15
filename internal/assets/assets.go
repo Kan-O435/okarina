@@ -24,8 +24,35 @@ var TempleBody []byte
 //go:embed models/link-knight.glb
 var LinkKnight []byte
 
+// TempleTree は、神殿フィールド専用の木のGLB(Sketchfab「Stylize Tree
+// Lowpoly」、作者: uday、CC Attribution、
+// https://sketchfab.com/3d-models/stylize-tree-lowpoly-dcf20a5a86784331a34657e94442511f)。
+// 以前使っていたTrees(CC0、Gobkit Nature Kit)より作り込まれた見た目の
+// 単色針葉樹モデルに、この神殿フィールドだけ差し替えている(草原・ガノン
+// フィールドは引き続きTreesを使う)。詳細は
+// docs/licenses/sketchfab-uday-stylize-tree-CC-BY.txt参照。スキンは無く
+// 単一メッシュ+埋め込みテクスチャのため、通常のLoadGLBMeshで読み込む
+// (internal/renderer/demo.goのtreeObjects参照)。
+//
+//go:embed models/temple-tree.glb
+var TempleTree []byte
+
+// TempleCloud は、神殿フィールドの空に浮かべる雲のGLB(Sketchfab
+// 「Stylized Clouds Pack - Vol 09」、作者: PolyOne Studio、CC Attribution、
+// https://sketchfab.com/3d-models/stylized-clouds-pack-vol-09-d9c1ff67f80841c6b1d8229dca5495a5)。
+// 16種類のブロック調の雲メッシュが1つのGLBにまとまっており、そのうち
+// いくつかを選んで神殿の上空に手動配置する(internal/renderer/demo.goの
+// templeCloudObjects参照)。スキンは無くパーツごとに別メッシュへ分かれて
+// いるため、GanonBoss等と同じLoadGLBParts/CombinedGroundTransformで
+// 読み込む。詳細はdocs/licenses/sketchfab-polyonestudio-clouds-CC-BY.txt
+// 参照。草原フィールドの雲(CloudTexture、平面の板)とは別物。
+//
+//go:embed models/temple-cloud.glb
+var TempleCloud []byte
+
 // Trees は、フィールドに配置する木(CC0、Gobkit Nature Kit)のGLB群。
-// 本数が多いので個別変数ではなくembed.FSでまとめて埋め込む。
+// 本数が多いので個別変数ではなくembed.FSでまとめて埋め込む。神殿フィールド
+// はTempleTreeに差し替え済みのため、現在は草原・ガノンフィールドで使う。
 //
 //go:embed models/trees/*.glb
 var Trees embed.FS
@@ -104,6 +131,20 @@ var GanonBoss []byte
 //
 //go:embed models/ganon-boss-battle.glb
 var GanonBossBattle []byte
+
+// RockDebris は、玉座の間(GanonBackgroundHall)が崩れる演出で降らせる岩の
+// GLB。Sketchfabの「Stone Pack」(作者: ashkan.fancy、CC Attribution、
+// https://sketchfab.com/3d-models/stone-pack-f3e0a67b9ca243b09119177649f21e17)
+// のうち、大小の岩(Big/Mid/Small、計19パーツ)だけを抜き出したもの
+// (装飾用のルーン岩・柱パーツは崩落演出には不要なため除外)。元のGLBは
+// テクスチャ込みで約11.6MBあったため、baseColorTextureとして実際に
+// 使われる3枚のみ残し、512px・JPEG(quality 80程度)に圧縮して約2.1MBまで
+// 削減している。パーツごとに別メッシュ・別テクスチャへ分かれているため、
+// GanonBoss等と同様LoadRockDebrisParts(gltf.ParseParts)で読み込む。
+// 詳細はdocs/licenses/sketchfab-ashkanfancy-stonepack-CC-BY.txt参照。
+//
+//go:embed models/rock-debris.glb
+var RockDebris []byte
 
 // Horse は、草原フィールドで「馬の歌」を演奏すると呼び出される馬のGLB
 // (CC0、Quaternius "Ultimate Animated Animal Pack"、docs/assets/horse/
