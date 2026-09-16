@@ -26,13 +26,17 @@ canvas {
   object-fit: contain;
 }
 #bridge-controls,
-#audio-controls {
+#audio-controls,
+#debug-controls {
   margin-top: 12px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
 }
 #bridge-controls button,
-#audio-controls button {
+#audio-controls button,
+#debug-controls button {
   background: #222;
   color: #eee;
   border: 1px solid #444;
@@ -40,11 +44,20 @@ canvas {
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 #bridge-controls button:disabled,
-#audio-controls button:disabled {
+#audio-controls button:disabled,
+#debug-controls button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+#bridge-controls button:not(:disabled):hover,
+#audio-controls button:not(:disabled):hover,
+#debug-controls button:not(:disabled):hover,
+#btn-start-mic-pitch:not(:disabled):hover {
+  background: #2c2c2c;
+  border-color: #5a5a5a;
 }
 #bridge-log {
   margin-top: 8px;
@@ -54,9 +67,36 @@ canvas {
   overflow-y: auto;
 }
 h3 {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   color: #888;
-  margin: 16px 0 4px;
+  margin: 20px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid #262626;
+  text-align: center;
+}
+h3:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* field-note は、各フィールドページ上部の説明文・戻る/他案へのリンク
+   (以前はページごとにバラバラなinline styleだった)を統一するクラス。 */
+.field-note {
+  font-size: 13px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.7;
+  margin: 16px 0 0;
+  max-width: 320px;
+}
+.field-note a {
+  color: #7CFC9A;
+  text-decoration: none;
+}
+.field-note a:hover {
+  text-decoration: underline;
 }
 #midi-status {
   font-size: 12px;
@@ -78,6 +118,7 @@ h3 {
   font-size: 13px;
   cursor: pointer;
   margin-top: 6px;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 #mic-pitch-info {
   display: flex;

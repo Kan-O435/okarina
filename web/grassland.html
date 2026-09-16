@@ -9,8 +9,8 @@
 
 <canvas id="game-canvas" width="800" height="600"></canvas>
 
-<p style="font-size: 13px; color: #aaa;">
-  <a href="temple.html" style="color: #7CFC9A;">神殿フィールドに戻る</a>
+<p class="field-note">
+  <a href="temple.html">神殿フィールドに戻る</a>
 </p>
 
 <h3>MIDI入力</h3>
@@ -37,7 +37,9 @@
 
 <h3>デバッグ操作</h3>
 <div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
-<button id="btn-summon-horse">馬に乗る(テスト)</button>
+<div id="debug-controls">
+  <button id="btn-summon-horse">馬に乗る(テスト)</button>
+</div>
 
 <script src="wasm_exec.js"></script>
 <script src="audio.js"></script>
