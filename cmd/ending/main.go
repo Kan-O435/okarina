@@ -51,7 +51,8 @@ type explosionPetal struct {
 // エンディング画面用のエントリーポイント。ガノン最終形態の撃破演出
 // (cmd/ganon-battle)から遷移してくる。花畑の上でLinkとゼルダ姫が
 // 向かい合って立ち、その2人をまとめて1つの塊とみなしてゆっくり回転させる
-// (renderer.BuildEndingScene参照)。オタマトーンの音程を大きく上下させる
+// (renderer.BuildEndingScene参照)。起動直後にファンファーレ(game.
+// PlayEndingFanfare)を鳴らす。オタマトーンの音程を大きく上下させる
 // (高い音→低い音、または低い音→高い音)と、花びらが爆発的に追加で舞う
 // 演出があるため(game.OnEndingPitchDetected参照)、bridge.Init()を呼ぶ。
 func main() {
@@ -59,6 +60,7 @@ func main() {
 
 	if runtime.GOOS == "js" {
 		bridge.Init()
+		game.PlayEndingFanfare()
 
 		ctx, err := renderer.NewContext("game-canvas")
 		if err != nil {

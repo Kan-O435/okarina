@@ -530,6 +530,8 @@ var audioHooksMu sync.Mutex
 // ファーレ(web/ganon-battle.jsのplayGanonDefeatFanfare)を再生するための
 // フック。playStoryEvilLaughHookは、ストーリー画面に入った瞬間に鳴らす
 // ガノンの高笑い(web/story.jsのplayStoryEvilLaugh)を再生するための
+// フック。playEndingFanfareHookは、エンディング画面に入った瞬間に鳴らす
+// ファンファーレ(web/ending.jsのplayEndingFanfare)を再生するための
 // フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS
 // 未初期化時はnilのまま。
 // sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
@@ -543,6 +545,7 @@ var (
 	playGanonBattleThunderHook     func()
 	playGanonDefeatFanfareHook     func()
 	playStoryEvilLaughHook         func()
+	playEndingFanfareHook          func()
 	sleepHook                      = time.Sleep
 )
 
@@ -682,6 +685,27 @@ func SetPlayStoryEvilLaughFunc(f func()) {
 func PlayStoryEvilLaugh() {
 	audioHooksMu.Lock()
 	play := playStoryEvilLaughHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
+}
+
+// SetPlayEndingFanfareFunc は、エンディング画面に入った瞬間に鳴らす
+// ファンファーレを再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayEndingFanfareFunc(f func()) {
+	audioHooksMu.Lock()
+	playEndingFanfareHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayEndingFanfare は、エンディング画面に入った瞬間に鳴らすファンファーレ
+// (mp3、web/assets/audio/ending-fanfare.mp3)を再生する。cmd/ending/
+// main.goが、起動直後に呼ぶ想定。フックが未登録(ネイティブビルドやJS
+// 未初期化時)の場合は何もしない。
+func PlayEndingFanfare() {
+	audioHooksMu.Lock()
+	play := playEndingFanfareHook
 	audioHooksMu.Unlock()
 	if play != nil {
 		play()
