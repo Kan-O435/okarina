@@ -160,3 +160,19 @@ h3:first-of-type {
   pointer-events: none;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
 }
+/* field-hint: 各フィールドのcanvas上に添える指示テキスト共通のスタイル
+   (楽譜HUDの下の「〜せよ!」、草原フィールドのジャンプの仕方など)。
+   表示・非表示はGo側の対応する条件(game.SetMelodyHUDVisibleFunc・
+   game.SetJumpHintVisibleFunc)に合わせて各web/*.jsが切り替える。 */
+.field-hint {
+  position: absolute;
+  top: 185px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+}

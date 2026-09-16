@@ -213,6 +213,7 @@ func main() {
 			// する関数を差し替えずとも、game.TriggerGanonBattleDefeat()を
 			// 呼ぶ側を増やすだけで配線できる。
 			game.SetGanonBattleDefeatTrigger(startDefeat)
+			game.SetMelodyHUDVisibleFunc(func() bool { return !game.GanonBattleMelodyPlayed() })
 
 			ctx.RunLoop(func(dt float64) {
 				switch phase {

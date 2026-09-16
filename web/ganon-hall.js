@@ -93,6 +93,16 @@ if (!WebAssembly) {
       });
 
       initMIDI();
+
+      // 楽譜HUD(WebGL側)に添えた煽り文は、楽譜HUD本体と全く同じ
+      // タイミング(game.SetMelodyHUDVisibleFuncで登録された条件)で
+      // 表示・非表示を切り替える。
+      const melodyHintEl = document.getElementById('ganon-hall-melody-hint');
+      function updateMelodyHintVisibility() {
+        melodyHintEl.hidden = !(window.goMelodyHUDVisible && window.goMelodyHUDVisible());
+        requestAnimationFrame(updateMelodyHintVisibility);
+      }
+      requestAnimationFrame(updateMelodyHintVisibility);
     })
     .catch((err) => {
       console.error("WASMのロードに失敗しました:", err);

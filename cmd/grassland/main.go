@@ -103,6 +103,14 @@ func main() {
 				if err != nil {
 					fmt.Println("renderer: failed to build horse song sheet HUD:", err)
 				}
+				game.SetMelodyHUDVisibleFunc(func() bool {
+					return horseSongHUD != nil && !game.HorseSongPlayed() &&
+						math.Abs(player.Player.Z-grasslandFirstObstacleCenterZ) <= grasslandSongSheetRangeZ
+				})
+
+				// 馬に乗った後は、ジャンプの仕方(低い音を鳴らす)を教える
+				// ヒントを表示する。
+				game.SetJumpHintVisibleFunc(func() bool { return horseIndex >= 0 })
 
 				ctx.RunLoop(func(dt float64) {
 					prevZ := player.Player.Z

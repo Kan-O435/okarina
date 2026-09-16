@@ -87,6 +87,16 @@ if (!WebAssembly) {
 
       initMIDI();
 
+      // 楽譜HUD(WebGL側)に添えた煽り文は、楽譜HUD本体と全く同じ
+      // タイミング(game.SetMelodyHUDVisibleFuncで登録された条件)で
+      // 表示・非表示を切り替える。
+      const melodyHintEl = document.getElementById('ganon-battle-melody-hint');
+      function updateMelodyHintVisibility() {
+        melodyHintEl.hidden = !(window.goMelodyHUDVisible && window.goMelodyHUDVisible());
+        requestAnimationFrame(updateMelodyHintVisibility);
+      }
+      requestAnimationFrame(updateMelodyHintVisibility);
+
       // 「特定の演奏でGanonの最終形態を倒す」処理はまだ無いため、動作確認用の
       // ボタンから直接goDefeatGanonFinalForm()を呼ぶ仮実装
       // (web/ganon-hall.htmlのbtn-defeat-ganonと同様)。
