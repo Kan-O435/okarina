@@ -23,6 +23,15 @@ type Scene struct {
 // Render はScene内の全Objectを描画する。
 func (s *Scene) Render(c *Context) {
 	c.Clear()
+	s.RenderWithoutClear(c)
+}
+
+// RenderWithoutClear はRenderと同じくScene内の全Objectを描画するが、
+// 冒頭のc.Clear()を行わない。story.goのStoryBackground(キャンバス全体を
+// 覆うフルスクリーンの背景)のように、Scene.Renderより先に別の内容を
+// 描画しておき、その上にこのSceneを重ねて描きたい場合に使う
+// (Clear()すると先に描いた内容が消えてしまうため)。
+func (s *Scene) RenderWithoutClear(c *Context) {
 	s.Program.Use(c)
 	s.Program.SetUniformSampler(c, "uTexture", 0)
 

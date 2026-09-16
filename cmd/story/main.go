@@ -31,14 +31,22 @@ func main() {
 			width, height := ctx.CanvasSize()
 			ctx.Viewport(width, height)
 			ctx.EnableDepthTest()
+			ctx.EnableBlend()                    // 背景の炎(半透明テクスチャ)を正しく合成するため
 			ctx.ClearColor(0.05, 0.05, 0.1, 1.0) // タイトル画面と同じ暗い背景
 
-			scene, sceneErr := renderer.BuildStoryScene(ctx)
+			scene, flameAnim, sceneErr := renderer.BuildStoryScene(ctx)
+			background, bgErr := renderer.BuildStoryBackground(ctx, width, height)
 			if sceneErr != nil {
 				fmt.Println("renderer: failed to build story scene:", sceneErr)
+			} else if bgErr != nil {
+				fmt.Println("renderer: failed to build story background:", bgErr)
 			} else {
 				ctx.RunLoop(func(dt float64) {
-					scene.Render(ctx)
+					background.Update(dt)
+					flameAnim.Update(dt)
+					ctx.Clear()
+					background.Render(ctx, width, height)
+					scene.RenderWithoutClear(ctx)
 				})
 			}
 		}

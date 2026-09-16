@@ -1,0 +1,19 @@
+Animated Fires (Small_Fireball_10x26.png)
+Author: Stealthix (https://stealthix.itch.io/)
+Source: https://stealthix.itch.io/animated-fires
+License: Creative Commons CC0 1.0 Universal (Public Domain)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+"This asset is released under CC-0, you may use it however you want"
+(author's own wording on the asset page).
+
+---
+
+Used as internal/assets/textures/story-flame-anim.png
+(internal/assets.StoryFlameAnimation), the flickering flame billboard
+behind Ganon on the story screen background (cmd/story,
+internal/renderer/story.go).
+
+Original file is a 100x156px sprite sheet, grid of 10 columns x 6 rows,
+each frame 10x26px (orange fire color variant, one of three colors in
+the pack). Only the first row (10 frames) is used as the animation loop.
