@@ -186,8 +186,10 @@ func main() {
 			ctx.RunLoop(func(dt float64) {
 				switch phase {
 				case ganonHallIdle:
-					player.Player.Update(dt)
-					renderer.SetLinkTransform(scene, link, player.Player.Transform(link.LocalTransform))
+					// このフィールドはボスを見せるための固定シーンのため、
+					// オタマトーン(マイク)の音程でLinkが歩き回らないよう、
+					// あえてplayer.Player.Update(dt)を呼ばない(スポーン時の
+					// 位置・向きのまま静止させる)。
 
 				case ganonHallSmoking:
 					smokeElapsed += dt
