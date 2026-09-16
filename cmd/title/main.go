@@ -125,7 +125,8 @@ func (b *backgroundOcarina) update(dt float64, scene *renderer.Scene, partCount 
 // 参照)がcanvasの手前に重なるため、この3DシーンはHUDのような背景装飾
 // として使う。手前でメインのオカリナがくるくる回り、奥では同じモデルの
 // 小さなオカリナが大量に飛び回る。MIDIキーボードで「ド(C、オクターブ
-// 不問)」を弾くと神殿フィールド(temple.html)へ遷移する導線を用意する。
+// 不問)」を弾くと、ストーリー・操作方法の説明画面(story.html)へ
+// 遷移する導線を用意する。
 func main() {
 	fmt.Println("Title screen initialized")
 
@@ -178,7 +179,7 @@ func main() {
 			}
 
 			game.SetTitleStartTrigger(func() {
-				ctx.Navigate("temple.html")
+				ctx.Navigate("story.html")
 			})
 		}
 
