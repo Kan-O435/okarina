@@ -32,7 +32,7 @@ const (
 )
 
 // ganonBattleDefeatPhase は、Ganon最終形態の撃破演出(嵐→雷→爆発→白
-// フェード→エンディングページへの遷移)の進行状態。ganonHallPhase
+// フェード→ゼルダ姫を迎えに行くフィールドへの遷移)の進行状態。ganonHallPhase
 // (cmd/ganon-hall/main.go)と同じ考え方で、idleの間は通常の操作を続け、
 // トリガーが呼ばれたら1段階ずつ進める。
 type ganonBattleDefeatPhase int
@@ -42,18 +42,29 @@ const (
 	ganonBattleDefeatStorming
 	ganonBattleDefeatLightning
 	ganonBattleDefeatExploding
+	ganonBattleDefeatSettling
 	ganonBattleDefeatFading
 )
 
 // 各段階の長さ(秒)。トドメの演出なので、テンポよく畳みかけるのではなく、
 // じっくり見せる長さにしている。雷フェーズは、画面全体を覆う複数の雷が
-// 明滅する派手さを出すため0.5→0.9秒に伸ばしている。
+// 明滅する派手さを出すため0.5→0.9秒に伸ばしている。ganonBattleDefeat
+// SettlingDurationは、爆発が収まった後、白フェードが始まるまでの「ため」
+// (煙・岩片が舞う様子を少し見せてから画面が白くなるようにする)。
 const (
 	ganonBattleDefeatStormingDuration  = 2.5
 	ganonBattleDefeatLightningDuration = 0.9
 	ganonBattleDefeatExplodingDuration = 1.4
+	ganonBattleDefeatSettlingDuration  = 3.0
 	ganonBattleDefeatFadingDuration    = 1.2
 )
+
+// ganonBattleDefeatFanfareDuration は、爆発演出の開始と同時に鳴らす撃破
+// ファンファーレ(assets/audio/ganon-defeat-fanfare.mp3)の再生時間。
+// 白フェード(ganonBattleDefeatFadingDuration)が終わった後も、この時間が
+// 経過してファンファーレが鳴り終わるまでは白い画面のまま待ってから
+// rescue.htmlへ遷移する(演出の途中で音声が途切れないようにするため)。
+const ganonBattleDefeatFanfareDuration = 10.8
 
 // ganonBattleLightningFlickers は、雷フェーズ(0〜1に正規化した経過割合)の
 // 間に画面全体を明滅させる閃光の区間一覧。1回の大きな光ではなく、本物の
@@ -118,7 +129,8 @@ type ganonBattleDefeatDebris struct {
 // そのまま使えるようにする。
 //
 // 起動直後のwipe岩演出(ganon-hallからの遷移演出)とは別に、Ganon最終形態を
-// 倒した際の撃破演出(嵐→雷→爆発→白フェード→ending.htmlへの遷移)を
+// 倒した際の撃破演出(嵐→雷→爆発(撃破ファンファーレ再生開始)→白フェード
+// →ファンファーレが鳴り終わるまで待機→rescue.htmlへの遷移)を
 // ganonBattleDefeatPhaseのステートマシンとして持つ。「特定の演奏で倒す」
 // メロディ判定はまだ無いため、現時点ではデバッグボタンから
 // game.SetGanonBattleDefeatTrigger経由で呼ばれる想定。
@@ -195,6 +207,12 @@ func main() {
 			// 一度隠したら「テスト再生」的な多重実行はしない想定
 			// (このデバッグボタンはページ遷移前提の一回限りの演出のため)。
 			bossHidden := false
+
+			// fanfareElapsedは、撃破ファンファーレの再生を始めてから
+			// (bossHiddenがtrueになった瞬間から)の経過時間。白フェード後、
+			// この値がganonBattleDefeatFanfareDurationに達するまでページ
+			// 遷移を待つ。
+			fanfareElapsed := 0.0
 
 			// startDefeatは、Ganon最終形態撃破演出を開始する。idle以外の
 			// 間に呼ばれても無視する(演出中の多重トリガーを防ぐ、
@@ -309,6 +327,7 @@ func main() {
 				case ganonBattleDefeatExploding:
 					if !bossHidden {
 						bossHidden = true
+						game.PlayGanonDefeatFanfare()
 						// 「爆発して消える」を実際にGanon本体を隠すことで
 						// 表現する(画面外の十分下へ落とすだけで、Objectの
 						// 削除やSceneの作り直しはしない)。直後の閃光
@@ -374,6 +393,16 @@ func main() {
 					}
 
 					if phaseElapsed >= ganonBattleDefeatExplodingDuration {
+						phase = ganonBattleDefeatSettling
+						phaseElapsed = 0
+					}
+
+				case ganonBattleDefeatSettling:
+					// 爆発が収まった後の「ため」。煙・岩片は爆発フェーズの
+					// 最終状態のまま静止させておき、白フェードへの遷移だけ
+					// 少し遅らせる。
+					phaseElapsed += dt
+					if phaseElapsed >= ganonBattleDefeatSettlingDuration {
 						phase = ganonBattleDefeatFading
 						phaseElapsed = 0
 					}
@@ -386,10 +415,20 @@ func main() {
 					}
 					overlayAlpha = t
 
-					if !navigated && phaseElapsed >= ganonBattleDefeatFadingDuration {
+					if !navigated && phaseElapsed >= ganonBattleDefeatFadingDuration && fanfareElapsed >= ganonBattleDefeatFanfareDuration {
 						navigated = true
-						ctx.Navigate("ending.html")
+						// エンディングへ直接は飛ばさず、ゼルダ姫を迎えに行く
+						// フィールド(cmd/rescue)を経由する(rescue.htmlが
+						// たどり着いた際にending.htmlへ遷移する)。
+						ctx.Navigate("rescue.html")
 					}
+				}
+
+				if bossHidden {
+					// 撃破ファンファーレの再生中は、鳴り終わるまで(白い
+					// 画面のまま)ページ遷移を待つ(ganonBattleDefeatFading
+					// のnavigate条件参照)。
+					fanfareElapsed += dt
 				}
 
 				if wipeFalling {

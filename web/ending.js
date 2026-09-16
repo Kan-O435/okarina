@@ -6,83 +6,13 @@ const ENDING_MIC_THRESHOLD_DB = -30;
 const btnStartEndingMic = document.getElementById('btn-start-ending-mic');
 const endingMicStatusEl = document.getElementById('ending-mic-status');
 
-// endingAudioCtx は、マイク入力の解析(startEndingMic)と勝利ファンファーレ
-// の再生(playEndingFanfare)の両方で共有するAudioContext。ページを開いた
-// 瞬間にできるだけ早く「running」状態になるチャンスを作るため、モジュール
-// 読み込み時点(ボタンクリックを待たず)に生成しておく。
+// endingAudioCtx は、マイク入力の解析(startEndingMic)で使うAudioContext。
+// ページを開いた瞬間にできるだけ早く使えるよう、モジュール読み込み時点
+// (ボタンクリックを待たず)に生成しておく。
 const endingAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 let endingMicAnalyser = null;
 let endingMicBuffer = null;
-
-// endingFanfareBuffer/LoadPromiseは、エンディングに入った際に流す
-// ファンファーレ(assets/audio/ending-victory-fanfare.mp3)を事前に
-// デコードしたバッファ。web/grassland.js等の効果音と同じ方式
-// (事前デコード+自己修復フォールバック)。
-let endingFanfareBuffer = null;
-let endingFanfareLoadPromise = null;
-let endingFanfarePlayed = false;
-
-// loadEndingFanfare は、ファンファーレの取得・デコードを開始する
-// (すでに開始・完了済みなら何もしない)。デコード済みのAudioBufferで
-// 解決するPromiseを返す。
-function loadEndingFanfare() {
-  if (endingFanfareBuffer) {
-    return Promise.resolve(endingFanfareBuffer);
-  }
-  if (endingFanfareLoadPromise) {
-    return endingFanfareLoadPromise;
-  }
-  endingFanfareLoadPromise = fetch('assets/audio/ending-victory-fanfare.mp3')
-    .then((res) => res.arrayBuffer())
-    .then((data) => endingAudioCtx.decodeAudioData(data))
-    .then((buffer) => {
-      endingFanfareBuffer = buffer;
-      return buffer;
-    })
-    .catch((err) => {
-      console.error('ending fanfare: failed to load/decode', err);
-      endingFanfareLoadPromise = null; // 失敗時は次回呼び出しでもう一度試す
-      return null;
-    });
-  return endingFanfareLoadPromise;
-}
-
-// playEndingFanfare は、エンディングに入った際に一度だけファンファーレを
-// 再生する。ブラウザの自動再生ポリシーにより、ユーザー操作を経ていない
-// AudioContextは無音のまま(state: 'suspended')になる場合があるため、
-// resume()を試みてから再生する。それでも鳴らせなかった場合に備え、
-// ページ内の最初のクリック/タップで改めて再生を試みるフォールバックも
-// 用意している(呼び出し側のsetupEndingFanfareAutoplayFallback参照)。
-function playEndingFanfare() {
-  if (endingFanfarePlayed) {
-    return;
-  }
-  Promise.all([endingAudioCtx.resume().catch(() => {}), loadEndingFanfare()]).then(([, buffer]) => {
-    if (buffer && !endingFanfarePlayed && endingAudioCtx.state === 'running') {
-      endingFanfarePlayed = true;
-      const source = endingAudioCtx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(endingAudioCtx.destination);
-      source.start(0);
-    }
-  });
-}
-
-// setupEndingFanfareAutoplayFallback は、自動再生がブロックされた場合に
-// 備え、ページ内の最初のクリック/タップ/キー入力でAudioContextを
-// 改めてresume()し、まだ再生できていなければファンファーレを鳴らす。
-function setupEndingFanfareAutoplayFallback() {
-  const retry = () => {
-    if (endingFanfarePlayed) {
-      return;
-    }
-    playEndingFanfare();
-  };
-  ['pointerdown', 'keydown'].forEach((type) => {
-    document.addEventListener(type, retry, { once: true });
-  });
-}
 
 // endingMicFrame は、マイクの波形からピッチ(周波数)を検出し、
 // window.goOnEndingPitchDetected経由でGo側(花びらを舞わせる演出、
@@ -139,11 +69,6 @@ btnStartEndingMic.addEventListener('click', startEndingMic);
 // ダイアログが出るだけで済む。既に拒否されている等で失敗した場合は
 // catch内でステータス表示され、ボタンから手動で再試行できる)。
 startEndingMic();
-
-// エンディングに入った瞬間に勝利ファンファーレを鳴らす。
-loadEndingFanfare();
-playEndingFanfare();
-setupEndingFanfareAutoplayFallback();
 
 if (!WebAssembly) {
   console.error("このブラウザはWebAssemblyに対応していません");

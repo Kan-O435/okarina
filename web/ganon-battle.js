@@ -66,6 +66,61 @@ function playAudioBuffer(ctx, buffer) {
   source.start(0);
 }
 
+// ganonDefeatFanfareBuffer は、Ganon最終形態を倒した瞬間(爆発演出の
+// 開始時)に鳴らす撃破ファンファーレを事前にデコードしたバッファ。
+// ganonBattleSongBufferと同じ方式(事前デコード+自己修復フォールバック)。
+let ganonDefeatFanfareBuffer = null;
+let ganonDefeatFanfareLoadPromise = null;
+
+// loadGanonDefeatFanfare は、ファンファーレファイルの取得・デコードを
+// 開始する(すでに開始・完了済みなら何もしない)。デコード済みの
+// AudioBufferで解決するPromiseを返す。
+function loadGanonDefeatFanfare() {
+  if (ganonDefeatFanfareBuffer) {
+    return Promise.resolve(ganonDefeatFanfareBuffer);
+  }
+  if (ganonDefeatFanfareLoadPromise) {
+    return ganonDefeatFanfareLoadPromise;
+  }
+  const ctx = ensureAudioContext();
+  if (!ctx) {
+    return Promise.resolve(null);
+  }
+  ganonDefeatFanfareLoadPromise = fetch('assets/audio/ganon-defeat-fanfare.mp3')
+    .then((res) => res.arrayBuffer())
+    .then((data) => ctx.decodeAudioData(data))
+    .then((buffer) => {
+      ganonDefeatFanfareBuffer = buffer;
+      return buffer;
+    })
+    .catch((err) => {
+      console.error('ganon defeat fanfare: failed to load/decode', err);
+      ganonDefeatFanfareLoadPromise = null; // 失敗時は次回呼び出しでもう一度試す
+      return null;
+    });
+  return ganonDefeatFanfareLoadPromise;
+}
+
+// playGanonDefeatFanfare はGoから、Ganon最終形態を倒した瞬間(爆発演出の
+// 開始時)に呼ばれる。事前にデコード済みのAudioBufferがあれば即座に
+// 再生する。まだ読み込めていない場合は、ここで読み込みを開始し、
+// 終わり次第再生する。
+function playGanonDefeatFanfare() {
+  const ctx = ensureAudioContext();
+  if (!ctx) {
+    return;
+  }
+  if (ganonDefeatFanfareBuffer) {
+    playAudioBuffer(ctx, ganonDefeatFanfareBuffer);
+    return;
+  }
+  loadGanonDefeatFanfare().then((buffer) => {
+    if (buffer) {
+      playAudioBuffer(ctx, buffer);
+    }
+  });
+}
+
 if (!WebAssembly) {
   console.error("このブラウザはWebAssemblyに対応していません");
 } else {
@@ -78,6 +133,7 @@ if (!WebAssembly) {
       btnEnableAudio.addEventListener('click', () => {
         ensureAudioContext();
         loadGanonBattleSong();
+        loadGanonDefeatFanfare();
       });
 
       btnTestSound.addEventListener('click', () => {
