@@ -23,11 +23,19 @@ import (
 // ガノンの見た目の高さ・カメラからの距離。ganon-hall本編でのガノン
 // (ganonBossHallHeight=2.2、他の建物・ボスとのバランスを取った値)より
 // 大きめにして、テキストボックスの上に頭〜上半身が大きく覗く存在感を
-// 出している。distanceは、45°の垂直画角でこの高さがフレームの7割
-// 程度を占めるよう逆算した値。
+// 出している。
+//
+// assets.GanonBoss(このファイル・ganon.goのganonBossHallZ/Y付近の
+// コメント参照)はパーツの中に本体から大きく外れたバウンディングボックスを
+// 持つものが混ざっており、CombinedGroundTransformの「全パーツ合成の
+// バウンディングボックスからスケールを逆算する」処理が歪む(45°の垂直
+// 画角からの単純な逆算通りの距離だと、他のページと違って頭が画面上端で
+// 大きく見切れる)。そのため、distanceは計算式からではなく、実際の
+// レンダリング結果(他フィールドと同程度に画面に収まって見えるか)を
+// 見ながら実験的に決めている。
 const (
 	storyGanonHeight         = 5.5
-	storyGanonCameraDistance = 9.0
+	storyGanonCameraDistance = 14.0
 )
 
 // storyGanonYawDegrees は、ストーリー画面のガノンを既定の向き(+Z、カメラ側)
