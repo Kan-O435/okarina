@@ -54,7 +54,7 @@ async function startEndingMic() {
     endingMicBuffer = new Float32Array(endingMicAnalyser.fftSize);
     source.connect(endingMicAnalyser);
 
-    endingMicStatusEl.textContent = 'マイク入力を受信中(音程を大きく上下させると花びらが舞います)';
+    endingMicStatusEl.textContent = 'マイク入力を受信中';
     btnStartEndingMic.disabled = true;
     requestAnimationFrame(endingMicFrame);
   } catch (err) {
