@@ -525,8 +525,11 @@ var audioHooksMu sync.Mutex
 // フック。playGanonBattleSongHookは、嵐の歌を正しく演奏した後に流す本家の
 // BGM(web/ganon-battle.jsのplayGanonBattleSongOfStorms)を再生するための
 // フック。playGanonBattleThunderHookは、Ganon最終形態撃破演出中の雷鳴
-// (web/ganon-battle.jsで合成)を再生するためのフック。bridge.Init()がJS
-// 側の実装を差し込む。ネイティブビルドやJS未初期化時はnilのまま。
+// (web/ganon-battle.jsで合成)を再生するためのフック。
+// playGanonDefeatFanfareHookは、Ganon最終形態を倒した瞬間の撃破ファン
+// ファーレ(web/ganon-battle.jsのplayGanonDefeatFanfare)を再生するための
+// フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS
+// 未初期化時はnilのまま。
 // sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
 var (
 	playNoteHook                   func(note, velocity int)
@@ -536,6 +539,7 @@ var (
 	playGanonHallCollapseSoundHook func()
 	playGanonBattleSongHook        func()
 	playGanonBattleThunderHook     func()
+	playGanonDefeatFanfareHook     func()
 	sleepHook                      = time.Sleep
 )
 
@@ -631,6 +635,29 @@ func SetPlayGanonBattleThunderSoundFunc(f func()) {
 func PlayGanonBattleThunderSound() {
 	audioHooksMu.Lock()
 	play := playGanonBattleThunderHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
+}
+
+// SetPlayGanonDefeatFanfareFunc は、Ganon最終形態を倒した際に鳴らす撃破
+// ファンファーレを再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayGanonDefeatFanfareFunc(f func()) {
+	audioHooksMu.Lock()
+	playGanonDefeatFanfareHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayGanonDefeatFanfare は、Ganon最終形態を倒した際の撃破ファンファーレ
+// (mp3、web/assets/audio/ganon-defeat-fanfare.mp3)を再生する。
+// cmd/ganon-battle/main.goが、爆発演出の開始時に呼ぶ想定。ファンファーレが
+// 鳴り終わるまでは、白フェード後もrescue.htmlへのページ遷移を待つ
+// (cmd/ganon-battle/main.goのganonBattleDefeatFanfareDuration参照)。
+// フックが未登録(ネイティブビルドやJS未初期化時)の場合は何もしない。
+func PlayGanonDefeatFanfare() {
+	audioHooksMu.Lock()
+	play := playGanonDefeatFanfareHook
 	audioHooksMu.Unlock()
 	if play != nil {
 		play()

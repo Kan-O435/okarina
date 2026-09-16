@@ -45,6 +45,7 @@ func Init() {
 	game.SetPlayGanonHallCollapseSoundFunc(callPlayGanonHallCollapseSound)
 	game.SetPlayGanonBattleSongFunc(callPlayGanonBattleSong)
 	game.SetPlayGanonBattleThunderSoundFunc(callPlayGanonBattleThunderSound)
+	game.SetPlayGanonDefeatFanfareFunc(callPlayGanonDefeatFanfare)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -91,6 +92,14 @@ func callPlayGanonBattleSong() {
 // 戦場跡フィールドのみで定義される)。
 func callPlayGanonBattleThunderSound() {
 	js.Global().Call("playGanonBattleThunderSound")
+}
+
+// callPlayGanonDefeatFanfare はGoからJavaScript側の
+// playGanonDefeatFanfare()を呼び出し、Ganon最終形態を倒した瞬間の撃破
+// ファンファーレを再生する(web/ganon-battle.js、戦場跡フィールドのみで
+// 定義される)。
+func callPlayGanonDefeatFanfare() {
+	js.Global().Call("playGanonDefeatFanfare")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
