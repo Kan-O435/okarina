@@ -14,15 +14,17 @@ import (
 // 直接遷移する前にこのページを挟む。本文はHTML側(web/story.html)の
 // テキストボックスで表示するが、その背後にganon.goと同じガノン
 // (renderer.BuildStoryScene参照)を浮かべ、これから挑む相手の存在感を
-// 出している。このページでも「ド」を弾く(またはOキー)と神殿フィールドへ
-// 進む。タイトル画面と同じgame.SetTitleStartTrigger/OnMIDIEventの仕組み
-// をそのまま再利用する(ページごとに別プロセスとして起動するため、
-// トリガーの登録先が競合することはない)。
+// 出している。ページに入った瞬間にガノンの高笑い(game.
+// PlayStoryEvilLaugh)を鳴らす。このページでも「ド」を弾く(またはOキー)と
+// 神殿フィールドへ進む。タイトル画面と同じgame.SetTitleStartTrigger/
+// OnMIDIEventの仕組みをそのまま再利用する(ページごとに別プロセスとして
+// 起動するため、トリガーの登録先が競合することはない)。
 func main() {
 	fmt.Println("Story screen initialized")
 
 	if runtime.GOOS == "js" {
 		bridge.Init()
+		game.PlayStoryEvilLaugh()
 
 		ctx, err := renderer.NewContext("game-canvas")
 		if err != nil {

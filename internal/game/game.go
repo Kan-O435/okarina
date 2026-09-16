@@ -528,6 +528,8 @@ var audioHooksMu sync.Mutex
 // (web/ganon-battle.jsで合成)を再生するためのフック。
 // playGanonDefeatFanfareHookは、Ganon最終形態を倒した瞬間の撃破ファン
 // ファーレ(web/ganon-battle.jsのplayGanonDefeatFanfare)を再生するための
+// フック。playStoryEvilLaughHookは、ストーリー画面に入った瞬間に鳴らす
+// ガノンの高笑い(web/story.jsのplayStoryEvilLaugh)を再生するための
 // フック。bridge.Init()がJS側の実装を差し込む。ネイティブビルドやJS
 // 未初期化時はnilのまま。
 // sleepHookはtime.Sleepの差し替え用(テストで待ち時間を省略する)。
@@ -540,6 +542,7 @@ var (
 	playGanonBattleSongHook        func()
 	playGanonBattleThunderHook     func()
 	playGanonDefeatFanfareHook     func()
+	playStoryEvilLaughHook         func()
 	sleepHook                      = time.Sleep
 )
 
@@ -658,6 +661,27 @@ func SetPlayGanonDefeatFanfareFunc(f func()) {
 func PlayGanonDefeatFanfare() {
 	audioHooksMu.Lock()
 	play := playGanonDefeatFanfareHook
+	audioHooksMu.Unlock()
+	if play != nil {
+		play()
+	}
+}
+
+// SetPlayStoryEvilLaughFunc は、ストーリー画面に入った瞬間に鳴らす
+// ガノンの高笑いを再生する実装を登録する(bridge.Init()から呼ばれる)。
+func SetPlayStoryEvilLaughFunc(f func()) {
+	audioHooksMu.Lock()
+	playStoryEvilLaughHook = f
+	audioHooksMu.Unlock()
+}
+
+// PlayStoryEvilLaugh は、ストーリー画面に入った瞬間に鳴らすガノンの高笑い
+// (mp3、web/assets/audio/ganon-evil-laugh.mp3)を再生する。cmd/story/
+// main.goが、起動直後に呼ぶ想定。フックが未登録(ネイティブビルドやJS
+// 未初期化時)の場合は何もしない。
+func PlayStoryEvilLaugh() {
+	audioHooksMu.Lock()
+	play := playStoryEvilLaughHook
 	audioHooksMu.Unlock()
 	if play != nil {
 		play()
