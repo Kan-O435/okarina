@@ -126,6 +126,29 @@ var HorseSongContinuation = []ContinuationNote{
 	{MIDINote: 81, Duration: continuationLongDur},   // ラ₅ー
 }
 
+// titleStartJingleNoteDur は、TitleStartJingleの1音あたりの長さ。
+// 4音合計で約0.4秒になるようにしている(テンポの良い遷移演出にするため、
+// 他の自動再生曲で使うcontinuationNormalDurより短い)。
+const titleStartJingleNoteDur = 100 * time.Millisecond
+
+// TitleStartJingleReleaseTail は、ジングルの最後の音を止めてから画面遷移
+// (Navigate、ページ遷移によりAudioContextごと即座に消える)を始めるまで
+// 待つ時間。web/audio.jsのstopNoteは音量を0までランプさせるのに約80ms
+// (オシレーター停止は100ms)かかるため、遷移が早すぎると余韻が途中で
+// 切れて聞こえる。その分より少し長めに待つ。
+const TitleStartJingleReleaseTail = 200 * time.Millisecond
+
+// TitleStartJingle は、タイトル画面・ストーリー画面で「ド」を演奏(または
+// Oキー)した際に、次の画面へ遷移する前に鳴らす短いジングル
+// (ラ→レ→ミ→ラ)。最初のラだけ他の音より1オクターブ低く鳴らす。
+// ラ₄→レ₅→ミ₅→ラ₅
+var TitleStartJingle = []ContinuationNote{
+	{MIDINote: 69, Duration: titleStartJingleNoteDur}, // ラ₄(1オクターブ低い)
+	{MIDINote: 74, Duration: titleStartJingleNoteDur}, // レ₅
+	{MIDINote: 76, Duration: titleStartJingleNoteDur}, // ミ₅
+	{MIDINote: 81, Duration: titleStartJingleNoteDur}, // ラ₅
+}
+
 // Recognize は演奏されたMelodyが登録済みPatternのいずれかと完全一致するか判定する。
 // 一致すればそのPattern名を返す。一致しなければ空文字を返す。
 // MVPでは完全一致のみをサポートする。
