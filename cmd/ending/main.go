@@ -33,12 +33,12 @@ func randSignedRange(min, max float64) float64 {
 	return v
 }
 
-// explosionPetal は、オタマトーンの音程ジェスチャーで追加に舞う花びら
+// explosionPetal は、オタマトーンの音を検出するたびに追加で降らせる花びら
 // 1枚ぶんの実行時の状態。常時舞っているending.Petalsと違い、これらは
-// ジェスチャーのたびにspawnExplosionPetalで動的に生成する(枚数の上限は
-// 設けない)。velocityYにrenderer.EndingExplosionGravityによる疑似重力を
-// 適用することで、下から上へ(高い音→低い音)/上から下へ(低い音→高い音)
-// のどちらの爆発も同じ運動方程式で表現できる。
+// 音を検出するたびにspawnExplosionPetalで動的に生成するが、renderer.
+// EndingExplosionMaxTotal枚に達した後は最も古いものを再利用する
+// (リングバッファ、下記spawnExplosionPetal参照)。地面まで落ちた後は
+// landed=trueのままその場に留まり、降り積もった花びらとして残る。
 type explosionPetal struct {
 	objectIndex                             int
 	x, z                                    float64
@@ -51,9 +51,9 @@ type explosionPetal struct {
 // エンディング画面用のエントリーポイント。ガノン最終形態の撃破演出
 // (cmd/ganon-battle)から遷移してくる。花畑の上でLinkとゼルダ姫が
 // 向かい合って立ち、その2人をまとめて1つの塊とみなしてゆっくり回転させる
-// (renderer.BuildEndingScene参照)。オタマトーンの音程を大きく上下させる
-// (高い音→低い音、または低い音→高い音)と、花びらが爆発的に追加で舞う
-// 演出があるため(game.OnEndingPitchDetected参照)、bridge.Init()を呼ぶ。
+// (renderer.BuildEndingScene参照)。オタマトーンで音を鳴らすと、花びらが
+// 上空から追加で降ってきて降り積もる演出があるため(game.
+// OnEndingPitchDetected参照)、bridge.Init()を呼ぶ。
 func main() {
 	fmt.Println("Ending screen initialized")
 
@@ -86,51 +86,63 @@ func main() {
 				}
 				elapsed := 0.0
 
-				// explosionsは、音程ジェスチャーのたびに追加していく花びらの
-				// 実行時状態。使い回すプールを設けず、生成した分だけ増え続ける
-				// (枚数は無制限)。
-				var explosions []explosionPetal
+				// explosionsは、音を検出するたびに追加していく花びらの実行時
+				// 状態。renderer.EndingExplosionMaxTotal枚まではScene.Objects
+				// へ新しいObjectを追加していくが、それに達した後はnext
+				// ExplosionSlotが指す最も古い花びらのパラメータを上書きして
+				// 再利用する(リングバッファ)。マイクのピッチ検出はノイズで
+				// 細かく上下しやすく、短時間に連続発火しうるため、上限無しで
+				// 増やし続けるとdraw call数・メモリが際限なく増えて重くなる
+				// 不具合があった。
+				explosions := make([]explosionPetal, 0, renderer.EndingExplosionMaxTotal)
+				nextExplosionSlot := 0
 
 				// spawnExplosionPetalは、Link・ゼルダ姫のすぐ周り
-				// (renderer.EndingExplosionArea*)にランダムな位置で花びら
-				// Objectを1枚新しく生成し、指定した高さ・初速(上向きなら
-				// 正、下向きなら負)で運動を開始させる。
-				spawnExplosionPetal := func(startY, velocityY float64) {
-					ending.Scene.Objects = append(ending.Scene.Objects, renderer.Object{
-						Mesh:      ending.PetalMesh,
-						Texture:   ending.PetalTexture,
-						Transform: vecmath.Identity(),
-						Color:     vecmath.NewVec3(1, 1, 1),
-					})
-					explosions = append(explosions, explosionPetal{
-						objectIndex:   len(ending.Scene.Objects) - 1,
+				// (renderer.EndingExplosionArea*)にランダムな位置で花びらを
+				// 1枚、上空(renderer.EndingExplosionFallStart*)から降らせる。
+				spawnExplosionPetal := func() {
+					params := explosionPetal{
 						x:             randRange(-renderer.EndingExplosionAreaHalfX, renderer.EndingExplosionAreaHalfX),
 						z:             randRange(renderer.EndingExplosionAreaMinZ, renderer.EndingExplosionAreaMaxZ),
-						y:             startY,
-						velocityY:     velocityY,
+						y:             randRange(renderer.EndingExplosionFallStartMin, renderer.EndingExplosionFallStartMax),
+						velocityY:     -randRange(renderer.EndingExplosionFallSpeedMin, renderer.EndingExplosionFallSpeedMax),
 						swayAmplitude: randRange(0.2, 0.6),
 						swayFrequency: randRange(0.5, 1.3),
 						swayPhase:     randRange(0, 2*math.Pi),
 						spinSpeed:     randSignedRange(1.0, 3.0),
-					})
+					}
+
+					if len(explosions) < renderer.EndingExplosionMaxTotal {
+						ending.Scene.Objects = append(ending.Scene.Objects, renderer.Object{
+							Mesh:      ending.PetalMesh,
+							Texture:   ending.PetalTexture,
+							Transform: vecmath.Identity(),
+							Color:     vecmath.NewVec3(1, 1, 1),
+						})
+						params.objectIndex = len(ending.Scene.Objects) - 1
+						explosions = append(explosions, params)
+						return
+					}
+
+					// 上限に達した後は、既存のObjectをそのまま使い回し、
+					// パラメータだけ最も古いものへ上書きする(Scene.Objectsは
+					// 増やさない)。一周する頃には、その花びらは既に地面に
+					// 降り積もっているはずなので、消えて上空から降り直す
+					// ように見える。
+					params.objectIndex = explosions[nextExplosionSlot].objectIndex
+					explosions[nextExplosionSlot] = params
+					nextExplosionSlot = (nextExplosionSlot + 1) % renderer.EndingExplosionMaxTotal
 				}
 
-				// 高い音→低い音: 地面から爆発的に打ち上がる(下から上へ)。
-				game.SetEndingPetalFountainTrigger(func() {
+				// オタマトーンの音を検出するたびに(音程が大きく変化した
+				// 瞬間、および最初の一音)、花びらを上空から降らせる。
+				spawnExplosionBurst := func() {
 					for n := 0; n < renderer.EndingExplosionPetalCount; n++ {
-						spawnExplosionPetal(0, randRange(renderer.EndingExplosionRiseSpeedMin, renderer.EndingExplosionRiseSpeedMax))
+						spawnExplosionPetal()
 					}
-				})
-
-				// 低い音→高い音(および最初の一音): 上空から爆発的に降り注ぐ
-				// (上から下へ)。
-				game.SetEndingPetalShowerTrigger(func() {
-					for n := 0; n < renderer.EndingExplosionPetalCount; n++ {
-						startY := randRange(renderer.EndingExplosionFallStartMin, renderer.EndingExplosionFallStartMax)
-						speed := randRange(renderer.EndingExplosionFallSpeedMin, renderer.EndingExplosionFallSpeedMax)
-						spawnExplosionPetal(startY, -speed)
-					}
-				})
+				}
+				game.SetEndingPetalFountainTrigger(spawnExplosionBurst)
+				game.SetEndingPetalShowerTrigger(spawnExplosionBurst)
 
 				ctx.RunLoop(func(dt float64) {
 					angle += endingSpinSpeed * dt
@@ -154,10 +166,10 @@ func main() {
 						ending.Scene.Objects[p.ObjectIndex].Transform = transform
 					}
 
-					// 爆発的に舞う花びらは、疑似重力(renderer.
-					// EndingExplosionGravity)で放物運動させる。着地済み
-					// (landed=true)のものは、その場(Y=0)で静止させたまま
-					// 何もしない(地面に積もった花びらとして残す)。
+					// 音を検出して降ってきた花びらは、疑似重力(renderer.
+					// EndingExplosionGravity)で徐々に加速しながら落下する。
+					// 着地済み(landed=true)のものは、その場(Y=0)で静止させた
+					// まま何もしない(地面に積もった花びらとして残す)。
 					for i := range explosions {
 						p := &explosions[i]
 						if p.landed {

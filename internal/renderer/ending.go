@@ -66,16 +66,24 @@ const (
 	EndingPetalFallSpeedMax = 0.75
 )
 
-// EndingExplosionPetalCount は、音程ジェスチャー(高い音→低い音、または
-// 低い音→高い音)1回あたりに新しく生成する花びらの枚数。使い回すプールは
-// 設けず、cmd/ending/main.goがジェスチャーのたびにScene.Objectsへ新しい
-// 花びらを追加していく(枚数の上限は設けない、際限なく増やしてよい)。
+// EndingExplosionPetalCount は、オタマトーンの音を検出するたびに新しく
+// 生成する花びらの枚数。
 const EndingExplosionPetalCount = 80
 
-// EndingExplosionGravity は、爆発的に舞う花びらの上下運動(打ち上げ→
-// 減速→落下、または高速落下)に使う疑似重力(ワールド単位/秒^2)。
-// cmd/ending/main.goが、velocityY -= Gravity*dt という単純な運動方程式で
-// 打ち上げ花火のような放物運動を再現するのに使う。
+// EndingExplosionMaxTotal は、爆発的に舞う花びら(explosionPetal)の
+// 総数の上限。マイクのピッチ検出はノイズで細かく上下しやすく、音を検出
+// するたびに上限無く増やし続けるとScene.Objectsとdraw call数が際限なく
+// 増えて重くなる不具合があったため導入した。cmd/ending/main.goは、この
+// 上限に達したら新規追加をやめ、最も古い花びら(リングバッファが一周する
+// 頃には、既に地面に降り積もっているはず)を再利用して上空から降らせ直す。
+// EndingExplosionPetalCountの10回分(800枚)を確保し、連続して音を鳴らしても
+// 画面が薄まって見えない密度を保つ。
+const EndingExplosionMaxTotal = EndingExplosionPetalCount * 10
+
+// EndingExplosionGravity は、爆発的に舞う花びらが上空から降ってくる際の
+// 落下運動に使う疑似重力(ワールド単位/秒^2)。cmd/ending/main.goが、
+// velocityY -= Gravity*dt という単純な運動方程式で、徐々に加速しながら
+// 落ちる動きを再現するのに使う。
 const EndingExplosionGravity = 4.0
 
 // EndingExplosionAreaHalfX/MinZ/MaxZは、爆発的に舞う花びらを生成する範囲。
@@ -88,20 +96,10 @@ const (
 	EndingExplosionAreaMaxZ  = 2.0
 )
 
-// EndingExplosionRiseSpeedMin/Maxは、「高い音→低い音」のジェスチャーで
-// 地面から打ち上がる花びらの初速(上向き、ワールド単位/秒)の範囲。
-// EndingExplosionGravityで徐々に減速し、頂点に達した後は自然に落下へ
-// 転じる(打ち上げ花火のような放物運動)。
-const (
-	EndingExplosionRiseSpeedMin = 4.0
-	EndingExplosionRiseSpeedMax = 7.0
-)
-
-// EndingExplosionFallSpeedMin/Maxは、「低い音→高い音」のジェスチャーで
-// 上空から勢いよく降り注ぐ花びらの初速(下向き、ワールド単位/秒)の範囲。
-// EndingExplosionFallStartMin/Maxは、その花びらが生成される高さの範囲
-// (常に舞っている花吹雪のEndingPetalMaxHeightより高い位置から降らせ、
-// より勢いよく見せる)。
+// EndingExplosionFallSpeedMin/Maxは、音を検出するたびに上空から降らせる
+// 花びらの初速(下向き、ワールド単位/秒)の範囲。EndingExplosionFallStart
+// Min/Maxは、その花びらが生成される高さの範囲(常に舞っている花吹雪の
+// EndingPetalMaxHeightより高い位置から降らせ、より勢いよく見せる)。
 const (
 	EndingExplosionFallSpeedMin = 3.0
 	EndingExplosionFallSpeedMax = 6.0
