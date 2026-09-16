@@ -311,6 +311,79 @@ func OnPitchDetected(freq float64) {
 	updateJumpGesture(freq)
 }
 
+// endingPetalFountainTrigger は、エンディング画面でオタマトーンの音程が
+// 高い音→低い音に変わった瞬間に呼ばれる関数。花びらが地面から爆発的に
+// 打ち上がる(下から上へ)演出を開始する。cmd/ending/main.goが起動時に
+// 登録する(horseSummoner等と同様のコールバックパターン)。
+var endingPetalFountainTrigger func()
+
+// endingPetalShowerTrigger は、エンディング画面でオタマトーンの音程が
+// 低い音→高い音に変わった瞬間(および最初の一音)に呼ばれる関数。花びらが
+// 上空から爆発的に降り注ぐ(上から下へ)演出を開始する。
+var endingPetalShowerTrigger func()
+
+// SetEndingPetalFountainTrigger/SetEndingPetalShowerTrigger は、それぞれの
+// 花びら演出を開始する関数を登録する。
+func SetEndingPetalFountainTrigger(f func()) {
+	endingPetalFountainTrigger = f
+}
+func SetEndingPetalShowerTrigger(f func()) {
+	endingPetalShowerTrigger = f
+}
+
+// endingPitchGestureDeadZone は、エンディング画面のピッチジェスチャー判定
+// における「音程が変化した」とみなす最小変化量(半音)。プレイヤー移動の
+// 判定(internal/player.semitoneDeadZone)と同じ考え方の値を使う。
+const endingPitchGestureDeadZone = 0.5
+
+// endingHasPitch/endingLastSemitone は、直前に検出したピッチ(半音値)を
+// 保持する、OnEndingPitchDetected専用の状態。
+var (
+	endingHasPitch     bool
+	endingLastSemitone float64
+)
+
+// OnEndingPitchDetected はマイクから検出された最新のピッチ(Hz)を受け取り、
+// 音程の変化の向きに応じて花びらの演出を開始する。高い音→低い音への変化
+// (差がendingPitchGestureDeadZoneを超えて下がった場合)はendingPetal
+// FountainTrigger(下から上へ爆発的に)、低い音→高い音への変化(および
+// 無音から新しく音が鳴った最初の一音)はendingPetalShowerTrigger
+// (上から下へ爆発的に)を呼ぶ。freqが0以下(無音)の場合は基準をリセット
+// する(次に音が検出された時点のピッチを新たな基準にする、internal/
+// player.State.OnPitchと同じ考え方)。
+func OnEndingPitchDetected(freq float64) {
+	if freq <= 0 {
+		endingHasPitch = false
+		return
+	}
+
+	semitone := 12 * math.Log2(freq/440)
+	if !endingHasPitch {
+		// 最初の一音(基準が無い)は、上から降り注ぐ演出をデフォルトにする。
+		endingLastSemitone = semitone
+		endingHasPitch = true
+		if endingPetalShowerTrigger != nil {
+			endingPetalShowerTrigger()
+		}
+		return
+	}
+
+	delta := semitone - endingLastSemitone
+	switch {
+	case delta > endingPitchGestureDeadZone:
+		// 低い音→高い音
+		if endingPetalShowerTrigger != nil {
+			endingPetalShowerTrigger()
+		}
+	case delta < -endingPitchGestureDeadZone:
+		// 高い音→低い音
+		if endingPetalFountainTrigger != nil {
+			endingPetalFountainTrigger()
+		}
+	}
+	endingLastSemitone = semitone
+}
+
 // PlayerDirection は現在のプレイヤーの移動方向を文字列で返す
 // ("forward" | "backward" | "idle")。UI表示など、JS側からの参照用。
 func PlayerDirection() string {

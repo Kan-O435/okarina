@@ -45,25 +45,68 @@ const (
 	endingPetalHalfSize = 0.09
 )
 
-// endingPetalAreaHalfX/MinZ/MaxZは、花びらが漂う範囲(X: 中心から左右に
+// EndingPetalAreaHalfX/MinZ/MaxZは、花びらが漂う範囲(X: 中心から左右に
 // この幅、Z: この範囲)。Link・ゼルダ姫・カメラの周り全体に舞うよう、
 // 花畑の手前側を広めにカバーしている。
 const (
-	endingPetalAreaHalfX = 8.0
-	endingPetalAreaMinZ  = -8.0
-	endingPetalAreaMaxZ  = 4.0
+	EndingPetalAreaHalfX = 8.0
+	EndingPetalAreaMinZ  = -8.0
+	EndingPetalAreaMaxZ  = 4.0
 )
 
 // EndingPetalMaxHeight は、花びらが落ち始める高さの最大値(0〜この値の
 // ランダムな高さから、それぞれ独立して落ち始める)。
 const EndingPetalMaxHeight = 6.0
 
-// endingPetalFallSpeedMin/Maxは、花びらが落下する速さの範囲
+// EndingPetalFallSpeedMin/Maxは、花びらが落下する速さの範囲
 // (ワールド単位/秒)。実際の桜吹雪のように、ゆっくりひらひらと舞い落ちる
 // 速さにしている。
 const (
-	endingPetalFallSpeedMin = 0.35
-	endingPetalFallSpeedMax = 0.75
+	EndingPetalFallSpeedMin = 0.35
+	EndingPetalFallSpeedMax = 0.75
+)
+
+// EndingExplosionPetalCount は、音程ジェスチャー(高い音→低い音、または
+// 低い音→高い音)1回あたりに新しく生成する花びらの枚数。使い回すプールは
+// 設けず、cmd/ending/main.goがジェスチャーのたびにScene.Objectsへ新しい
+// 花びらを追加していく(枚数の上限は設けない、際限なく増やしてよい)。
+const EndingExplosionPetalCount = 80
+
+// EndingExplosionGravity は、爆発的に舞う花びらの上下運動(打ち上げ→
+// 減速→落下、または高速落下)に使う疑似重力(ワールド単位/秒^2)。
+// cmd/ending/main.goが、velocityY -= Gravity*dt という単純な運動方程式で
+// 打ち上げ花火のような放物運動を再現するのに使う。
+const EndingExplosionGravity = 4.0
+
+// EndingExplosionAreaHalfX/MinZ/MaxZは、爆発的に舞う花びらを生成する範囲。
+// 常に舞っているEndingPetalAreaより狭く、Link・ゼルダ姫のすぐ周りに絞る
+// ことで、画面全体に薄まらず「今、音を鳴らした」ことがはっきりわかる
+// 密度にしている。
+const (
+	EndingExplosionAreaHalfX = 3.5
+	EndingExplosionAreaMinZ  = -3.0
+	EndingExplosionAreaMaxZ  = 2.0
+)
+
+// EndingExplosionRiseSpeedMin/Maxは、「高い音→低い音」のジェスチャーで
+// 地面から打ち上がる花びらの初速(上向き、ワールド単位/秒)の範囲。
+// EndingExplosionGravityで徐々に減速し、頂点に達した後は自然に落下へ
+// 転じる(打ち上げ花火のような放物運動)。
+const (
+	EndingExplosionRiseSpeedMin = 4.0
+	EndingExplosionRiseSpeedMax = 7.0
+)
+
+// EndingExplosionFallSpeedMin/Maxは、「低い音→高い音」のジェスチャーで
+// 上空から勢いよく降り注ぐ花びらの初速(下向き、ワールド単位/秒)の範囲。
+// EndingExplosionFallStartMin/Maxは、その花びらが生成される高さの範囲
+// (常に舞っている花吹雪のEndingPetalMaxHeightより高い位置から降らせ、
+// より勢いよく見せる)。
+const (
+	EndingExplosionFallSpeedMin = 3.0
+	EndingExplosionFallSpeedMax = 6.0
+	EndingExplosionFallStartMin = EndingPetalMaxHeight * 1.0
+	EndingExplosionFallStartMax = EndingPetalMaxHeight * 1.5
 )
 
 // EndingScene は、エンディング画面のScene本体に加えて、Link・ゼルダ姫を
@@ -87,8 +130,16 @@ type EndingScene struct {
 	// Petalsは、舞い散る花びら(花吹雪)1枚ごとの静的パラメータ
 	// (Scene.Objects内のインデックス+揺れ方・落下速度等)の一覧。
 	// 呼び出し側(cmd/ending/main.go)が毎フレーム、これらを基に各花びらの
-	// 現在のY座標・回転角を計算してTransformを更新する。
+	// 現在のY座標・回転角を計算してTransformを更新する。常に舞い続ける
+	// 環境演出用(BuildEndingSceneで一度だけ位置を決める)。
 	Petals []EndingPetal
+
+	// PetalMesh/PetalTextureは、花びら1枚ぶんのメッシュ・テクスチャ
+	// (Petalsが共有しているのと同じもの)。cmd/ending/main.goが、
+	// 音程ジェスチャーのたびに新しい花びらObjectをScene.Objectsへ
+	// 動的に追加する(EndingExplosionPetalCount参照)際に使う。
+	PetalMesh    *Mesh
+	PetalTexture *Texture
 }
 
 // EndingPetal は、花吹雪の花びら1枚ぶんの静的パラメータ。位置・回転角の
@@ -207,10 +258,10 @@ func BuildEndingScene(c *Context) (*EndingScene, error) {
 		objects = append(objects, Object{Mesh: petalMesh, Texture: petalTexture, Transform: vecmath.Identity(), Color: vecmath.NewVec3(1, 1, 1)})
 		petals = append(petals, EndingPetal{
 			ObjectIndex:   len(objects) - 1,
-			X:             randRange(-endingPetalAreaHalfX, endingPetalAreaHalfX),
-			Z:             randRange(endingPetalAreaMinZ, endingPetalAreaMaxZ),
+			X:             randRange(-EndingPetalAreaHalfX, EndingPetalAreaHalfX),
+			Z:             randRange(EndingPetalAreaMinZ, EndingPetalAreaMaxZ),
 			StartY:        randRange(0, EndingPetalMaxHeight),
-			FallSpeed:     randRange(endingPetalFallSpeedMin, endingPetalFallSpeedMax),
+			FallSpeed:     randRange(EndingPetalFallSpeedMin, EndingPetalFallSpeedMax),
 			SwayAmplitude: randRange(0.2, 0.6),
 			SwayFrequency: randRange(0.5, 1.3),
 			SwayPhase:     randRange(0, 2*math.Pi),
@@ -227,6 +278,8 @@ func BuildEndingScene(c *Context) (*EndingScene, error) {
 		PairObjectStart:     pairStart,
 		PairLocalTransforms: pairLocalTransforms,
 		Petals:              petals,
+		PetalMesh:           petalMesh,
+		PetalTexture:        petalTexture,
 	}, nil
 }
 

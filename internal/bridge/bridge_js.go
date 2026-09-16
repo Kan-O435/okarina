@@ -18,6 +18,7 @@ func Init() {
 	js.Global().Set("goOnMIDIEvent", js.FuncOf(goOnMIDIEvent))
 	js.Global().Set("goOpenDoor", js.FuncOf(goOpenDoor))
 	js.Global().Set("goOnPitchDetected", js.FuncOf(goOnPitchDetected))
+	js.Global().Set("goOnEndingPitchDetected", js.FuncOf(goOnEndingPitchDetected))
 	js.Global().Set("goGetPlayerDirection", js.FuncOf(goGetPlayerDirection))
 	js.Global().Set("goSetDebugDirection", js.FuncOf(goSetDebugDirection))
 	js.Global().Set("goDefeatGanonFirstForm", js.FuncOf(goDefeatGanonFirstForm))
@@ -29,7 +30,7 @@ func Init() {
 	js.Global().Set("goDefeatGanonFinalForm", js.FuncOf(goDefeatGanonFinalForm))
 	js.Global().Set("goMelodyHUDVisible", js.FuncOf(goMelodyHUDVisible))
 	js.Global().Set("goJumpHintVisible", js.FuncOf(goJumpHintVisible))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody, goDefeatGanonFinalForm, goMelodyHUDVisible, goJumpHintVisible)")
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goOnEndingPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody, goDefeatGanonFinalForm, goMelodyHUDVisible, goJumpHintVisible)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
@@ -144,6 +145,21 @@ func goOnPitchDetected(this js.Value, args []js.Value) interface{} {
 		return nil
 	}
 	game.OnPitchDetected(args[0].Float())
+	return nil
+}
+
+// goOnEndingPitchDetected はJavaScript(エンディング画面のマイク入力の
+// ピッチ検出、web/ending.js)側から、検出した周波数(Hz)を渡すための
+// エントリーポイント。音量不足などでピッチが検出できなかった場合は0以下
+// を渡す。goOnPitchDetectedとは異なり、プレイヤーの移動には関係せず、
+// 音程が大きく上下した瞬間に花びらを舞わせる演出(game.
+// SetEndingPetalBurstTrigger参照)だけに使う。
+func goOnEndingPitchDetected(this js.Value, args []js.Value) interface{} {
+	if len(args) < 1 {
+		CallConsoleLog("bridge: goOnEndingPitchDetected expects 1 arg (frequencyHz)")
+		return nil
+	}
+	game.OnEndingPitchDetected(args[0].Float())
 	return nil
 }
 

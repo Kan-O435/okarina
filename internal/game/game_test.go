@@ -458,6 +458,103 @@ func TestOnPitchDetected_LowNoteAfterSilenceTriggersAgain(t *testing.T) {
 	}
 }
 
+func resetEndingPitchGesture() {
+	endingHasPitch = false
+}
+
+func TestOnEndingPitchDetected_FirstNoteTriggersShower(t *testing.T) {
+	resetEndingPitchGesture()
+	showers, fountains := 0, 0
+	SetEndingPetalShowerTrigger(func() { showers++ })
+	SetEndingPetalFountainTrigger(func() { fountains++ })
+	defer func() { SetEndingPetalShowerTrigger(nil); SetEndingPetalFountainTrigger(nil) }()
+
+	OnEndingPitchDetected(440) // 基準の無い最初の一音 → 上から降るデフォルト演出
+	if showers != 1 || fountains != 0 {
+		t.Fatalf("expected the first note to trigger exactly one shower and no fountain, got showers=%d fountains=%d", showers, fountains)
+	}
+}
+
+func TestOnEndingPitchDetected_SustainedNoteDoesNotRetrigger(t *testing.T) {
+	resetEndingPitchGesture()
+	showers := 0
+	SetEndingPetalShowerTrigger(func() { showers++ })
+	defer SetEndingPetalShowerTrigger(nil)
+
+	// 立ち上がりで1回発火した後、同じ音程を鳴らし続けても再発火しない。
+	for i := 0; i < 5; i++ {
+		OnEndingPitchDetected(440)
+	}
+	if showers != 1 {
+		t.Fatalf("expected a sustained note to trigger only once (on onset), got %d", showers)
+	}
+}
+
+func TestOnEndingPitchDetected_RisingPitchTriggersShower(t *testing.T) {
+	resetEndingPitchGesture()
+	showers, fountains := 0, 0
+	SetEndingPetalShowerTrigger(func() { showers++ })
+	SetEndingPetalFountainTrigger(func() { fountains++ })
+	defer func() { SetEndingPetalShowerTrigger(nil); SetEndingPetalFountainTrigger(nil) }()
+
+	OnEndingPitchDetected(220) // 音の立ち上がり(デフォルトのshower) → 1回目
+	OnEndingPitchDetected(440) // 1オクターブ上(低い音→高い音) → showerが追加でもう1回
+	if showers != 2 || fountains != 0 {
+		t.Fatalf("expected a rising pitch gesture to trigger the shower twice (never the fountain), got showers=%d fountains=%d", showers, fountains)
+	}
+}
+
+func TestOnEndingPitchDetected_FallingPitchTriggersFountain(t *testing.T) {
+	resetEndingPitchGesture()
+	showers, fountains := 0, 0
+	SetEndingPetalShowerTrigger(func() { showers++ })
+	SetEndingPetalFountainTrigger(func() { fountains++ })
+	defer func() { SetEndingPetalShowerTrigger(nil); SetEndingPetalFountainTrigger(nil) }()
+
+	OnEndingPitchDetected(440) // 音の立ち上がり(デフォルトのshower) → 1回目
+	OnEndingPitchDetected(220) // 1オクターブ下(高い音→低い音) → fountainが発火するはず
+	if showers != 1 || fountains != 1 {
+		t.Fatalf("expected the onset shower plus one fountain from the falling gesture, got showers=%d fountains=%d", showers, fountains)
+	}
+}
+
+func TestOnEndingPitchDetected_SmallChangeDoesNotRetrigger(t *testing.T) {
+	resetEndingPitchGesture()
+	showers, fountains := 0, 0
+	SetEndingPetalShowerTrigger(func() { showers++ })
+	SetEndingPetalFountainTrigger(func() { fountains++ })
+	defer func() { SetEndingPetalShowerTrigger(nil); SetEndingPetalFountainTrigger(nil) }()
+
+	OnEndingPitchDetected(440) // 音の立ち上がり → 1回目の発火
+	OnEndingPitchDetected(441) // ほぼ同じ音程 → 追加では発火しないはず
+	if showers != 1 || fountains != 0 {
+		t.Fatalf("expected a tiny pitch change not to add an extra trigger, got showers=%d fountains=%d", showers, fountains)
+	}
+}
+
+func TestOnEndingPitchDetected_SilenceAllowsRetriggerOnNextOnset(t *testing.T) {
+	resetEndingPitchGesture()
+	showers := 0
+	SetEndingPetalShowerTrigger(func() { showers++ })
+	defer SetEndingPetalShowerTrigger(nil)
+
+	OnEndingPitchDetected(440) // 1回目の立ち上がり → 発火
+	OnEndingPitchDetected(0)   // 無音 → 基準をリセット
+	OnEndingPitchDetected(440) // 無音を挟んだので、同じ音程でも新たな立ち上がりとして扱われ再び発火する
+	if showers != 2 {
+		t.Fatalf("expected a new onset after silence to trigger again, got %d", showers)
+	}
+}
+
+func TestOnEndingPitchDetected_NilTriggersDoNothing(t *testing.T) {
+	resetEndingPitchGesture()
+	SetEndingPetalShowerTrigger(nil)
+	SetEndingPetalFountainTrigger(nil)
+
+	OnEndingPitchDetected(440)
+	OnEndingPitchDetected(220) // パニックしないことを確認する
+}
+
 func TestOnPitchDetected_HighNoteDoesNotTriggerJump(t *testing.T) {
 	resetJumpGesture()
 	triggered := 0
