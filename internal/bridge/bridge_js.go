@@ -46,6 +46,7 @@ func Init() {
 	game.SetPlayGanonBattleSongFunc(callPlayGanonBattleSong)
 	game.SetPlayGanonBattleThunderSoundFunc(callPlayGanonBattleThunderSound)
 	game.SetPlayGanonDefeatFanfareFunc(callPlayGanonDefeatFanfare)
+	game.SetPlayStoryEvilLaughFunc(callPlayStoryEvilLaugh)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -100,6 +101,13 @@ func callPlayGanonBattleThunderSound() {
 // 定義される)。
 func callPlayGanonDefeatFanfare() {
 	js.Global().Call("playGanonDefeatFanfare")
+}
+
+// callPlayStoryEvilLaugh はGoからJavaScript側のplayStoryEvilLaugh()を
+// 呼び出し、ストーリー画面に入った瞬間のガノンの高笑いを再生する
+// (web/story.js、ストーリー画面のみで定義される)。
+func callPlayStoryEvilLaugh() {
+	js.Global().Call("playStoryEvilLaugh")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
