@@ -9,10 +9,10 @@
 
 <canvas id="game-canvas" width="800" height="600"></canvas>
 
-<p style="font-size: 13px; color: #aaa;">
+<p class="field-note">
   ガノンフィールド(玉座の間案)。<br>
-  <a href="grassland.html" style="color: #7CFC9A;">草原フィールドに戻る</a> /
-  <a href="ganon-battle.html" style="color: #7CFC9A;">戦場跡案を見る</a>
+  <a href="grassland.html">草原フィールドに戻る</a> /
+  <a href="ganon-battle.html">戦場跡案を見る</a>
 </p>
 
 <h3>MIDI入力</h3>
@@ -39,8 +39,10 @@
 
 <h3>デバッグ操作</h3>
 <div id="debug-status">矢印キー(→:前進 / ←:後退)でもLinkを動かせます(マイク不要)</div>
-<button id="btn-defeat-ganon">ガノン(第一形態)を倒した(テスト)</button>
-<button id="btn-preview-collapse">崩落演出をテスト再生</button>
+<div id="debug-controls">
+  <button id="btn-defeat-ganon">ガノン(第一形態)を倒した(テスト)</button>
+  <button id="btn-preview-collapse">崩落演出をテスト再生</button>
+</div>
 
 <script src="wasm_exec.js"></script>
 <script src="audio.js"></script>
