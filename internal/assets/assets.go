@@ -251,3 +251,29 @@ var FlowerFieldTexture []byte
 //
 //go:embed textures/petal.png
 var PetalTexture []byte
+
+// StoryFlameAnimation は、ストーリー画面(cmd/story)の背景でガノンの周りに
+// 燃え上がる炎のアニメーション用スプライトシート(itch.io「Animated Fires」、
+// 作者: Stealthix、CC0、https://stealthix.itch.io/animated-fires、
+// Small_Fireball_10x26.pngをそのまま使用)。1フレーム10x26px、横10列×縦6行
+// (合計60フレーム)のグリッドのうち、先頭の1行(10フレーム)をアニメーション
+// ループとして使う(internal/renderer/story.go参照)。当初は静止画の3D
+// メッシュ(GLB)を使っていたが、炎が実際にちらつくアニメーションが欲しい
+// という要望を受けてこちらに置き換えた。詳細は
+// docs/licenses/itch-stealthix-animatedfires-CC0.txt参照。
+//
+//go:embed textures/story-flame-anim.png
+var StoryFlameAnimation []byte
+
+// StoryBackgroundFire は、ストーリー画面(cmd/story)の背景全体を覆う炎の
+// アニメーションGIF(20フレーム、498x373px、GIF89a)。プロジェクト所有者
+// から直接提供されたローカルファイル(出典・ライセンス不明、詳細は
+// docs/licenses/story-background-fire-NOTE.txt参照)。ブラウザの
+// createImageBitmapはGIFの最初のフレームしか取り出せないため、
+// image/gif(Go標準ライブラリ)でこのバイト列自体をデコードし、各フレームを
+// 直接WebGLテクスチャ化して切り替える(internal/renderer/story.goの
+// StoryBackground参照)。StoryFlameAnimation(炎のビルボード3本)は
+// この背景に置き換える形で無効化されている。
+//
+//go:embed textures/story-background-fire.gif
+var StoryBackgroundFire []byte

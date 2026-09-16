@@ -19,6 +19,7 @@ const (
 	glTextureWrapT      = 0x2803
 	glTexture0          = 0x84C0
 	glUnpackFlipYWebgl  = 0x9240
+	glNearest           = 0x2600
 )
 
 // Texture はWebGLテクスチャオブジェクトをラップする。
@@ -98,6 +99,37 @@ func (c *Context) NewImageTexture(data []byte, mimeType string) (*Texture, error
 	result.bitmap.Call("close")
 
 	return &Texture{handle: tex}, nil
+}
+
+// NewPixelArtTexture はNewImageTextureと同じく画像バイナリをデコードして
+// テクスチャを生成するが、拡大時の補間をNEAREST(最近傍)にする。ドット絵の
+// スプライト(story.goの炎アニメーション等)を、LINEAR補間でぼかさず
+// くっきりした見た目のまま拡大表示するために使う。
+func (c *Context) NewPixelArtTexture(data []byte, mimeType string) (*Texture, error) {
+	tex, err := c.NewImageTexture(data, mimeType)
+	if err != nil {
+		return nil, err
+	}
+	tex.Bind(c)
+	c.gl.Call("texParameteri", glTexture2D, glTextureMinFilter, glNearest)
+	c.gl.Call("texParameteri", glTexture2D, glTextureMagFilter, glNearest)
+	return tex, nil
+}
+
+// NewRGBATexture は、既にデコード済みのRGBA8ピクセルデータ(width*height*4
+// バイト、行は画像の上から下、アルファは非事前乗算)から直接WebGLテクスチャを
+// 作る。NewImageTexture/NewPixelArtTextureとは異なりブラウザの画像デコーダを
+// 経由しないため、Go側で先にデコードしたデータ(image/gifでデコードした
+// アニメーションGIFの各フレーム等、createImageBitmapでは最初の1コマしか
+// 取り出せない形式)をそのままテクスチャ化したい場合に使う
+// (internal/renderer/story.goのStoryBackground参照)。
+func (c *Context) NewRGBATexture(pix []byte, width, height int) *Texture {
+	tex := c.gl.Call("createTexture")
+	c.gl.Call("bindTexture", glTexture2D, tex)
+	c.gl.Call("pixelStorei", glUnpackFlipYWebgl, true)
+	c.gl.Call("texImage2D", glTexture2D, 0, glRGBA, width, height, 0, glRGBA, glUnsignedByte, uint8ArrayOf(pix))
+	c.applyTextureParams()
+	return &Texture{handle: tex}
 }
 
 func (c *Context) applyTextureParams() {

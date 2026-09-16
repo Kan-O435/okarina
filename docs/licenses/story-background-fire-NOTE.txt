@@ -1,0 +1,18 @@
+story-background-fire.gif
+
+Source: プロジェクト所有者から直接提供されたローカルファイル
+(ダウンロード元不明、ファイル名はハッシュ値
+f96dfb9f9d4e0b42af3888de8b9473a7.gif)。
+
+ライセンス: 不明。本プロジェクトは個人学習用のMVP開発であり、非商用・
+非公開の検証目的で使用している。公開・商用配布する場合は、あらためて
+出典・ライセンスを確認すること。
+
+---
+
+Used as internal/assets/textures/story-background-fire.gif
+(internal/assets.StoryBackgroundFire)、ストーリー画面(cmd/story)背景の
+フルスクリーン炎アニメーション(internal/renderer/story.goのStoryBackground)。
+20フレーム、498x373px、GIF89a。image/gifでGoから直接デコードし、各フレームを
+そのままWebGLテクスチャ化して切り替え表示する(ブラウザのcreateImageBitmapは
+GIFの最初のフレームしか取り出せないため使わない)。
