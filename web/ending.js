@@ -14,6 +14,74 @@ const endingAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let endingMicAnalyser = null;
 let endingMicBuffer = null;
 
+// endingFanfareBuffer/LoadPromiseは、このページに入った際に流すファン
+// ファーレ(assets/audio/ending-fanfare.mp3)を事前にデコードしたバッファ。
+// web/grassland.js等の効果音と同じ方式(事前デコード+自己修復
+// フォールバック)。
+let endingFanfareBuffer = null;
+let endingFanfareLoadPromise = null;
+let endingFanfarePlayed = false;
+
+// loadEndingFanfare は、ファンファーレファイルの取得・デコードを開始する
+// (すでに開始・完了済みなら何もしない)。デコード済みのAudioBufferで
+// 解決するPromiseを返す。
+function loadEndingFanfare() {
+  if (endingFanfareBuffer) {
+    return Promise.resolve(endingFanfareBuffer);
+  }
+  if (endingFanfareLoadPromise) {
+    return endingFanfareLoadPromise;
+  }
+  endingFanfareLoadPromise = fetch('assets/audio/ending-fanfare.mp3')
+    .then((res) => res.arrayBuffer())
+    .then((data) => endingAudioCtx.decodeAudioData(data))
+    .then((buffer) => {
+      endingFanfareBuffer = buffer;
+      return buffer;
+    })
+    .catch((err) => {
+      console.error('ending fanfare: failed to load/decode', err);
+      endingFanfareLoadPromise = null; // 失敗時は次回呼び出しでもう一度試す
+      return null;
+    });
+  return endingFanfareLoadPromise;
+}
+
+// playEndingFanfare はGoから、このページに入った直後に呼ばれる。ブラウザの
+// 自動再生ポリシーにより、ユーザー操作を経ていないAudioContextは無音のまま
+// (state: 'suspended')になる場合があるため、resume()を試みてから再生する。
+// それでも鳴らせなかった場合に備え、ページ内の最初のクリック/タップ/キー
+// 入力で改めて再生を試みるフォールバックも用意している
+// (setupEndingFanfareAutoplayFallback参照)。
+function playEndingFanfare() {
+  if (endingFanfarePlayed) {
+    return;
+  }
+  Promise.all([endingAudioCtx.resume().catch(() => {}), loadEndingFanfare()]).then(([, buffer]) => {
+    if (buffer && !endingFanfarePlayed && endingAudioCtx.state === 'running') {
+      endingFanfarePlayed = true;
+      const source = endingAudioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(endingAudioCtx.destination);
+      source.start(0);
+    }
+  });
+}
+
+// setupEndingFanfareAutoplayFallback は、自動再生がブロックされた場合に
+// 備え、ページ内の最初のクリック/タップ/キー入力で改めて再生を試みる。
+function setupEndingFanfareAutoplayFallback() {
+  const retry = () => {
+    if (endingFanfarePlayed) {
+      return;
+    }
+    playEndingFanfare();
+  };
+  ['pointerdown', 'keydown'].forEach((type) => {
+    document.addEventListener(type, retry, { once: true });
+  });
+}
+
 // endingMicFrame は、マイクの波形からピッチ(周波数)を検出し、
 // window.goOnEndingPitchDetected経由でGo側(花びらを舞わせる演出、
 // game.OnEndingPitchDetected参照)へ渡す処理を毎フレーム繰り返す。
@@ -69,6 +137,11 @@ btnStartEndingMic.addEventListener('click', startEndingMic);
 // ダイアログが出るだけで済む。既に拒否されている等で失敗した場合は
 // catch内でステータス表示され、ボタンから手動で再試行できる)。
 startEndingMic();
+
+// ファンファーレの再生自体はGo側(game.PlayEndingFanfare、
+// cmd/ending/main.go)がこのページに入った直後に呼び出すが、自動再生が
+// ブロックされた場合のフォールバックはここで用意しておく。
+setupEndingFanfareAutoplayFallback();
 
 if (!WebAssembly) {
   console.error("このブラウザはWebAssemblyに対応していません");

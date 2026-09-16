@@ -47,6 +47,7 @@ func Init() {
 	game.SetPlayGanonBattleThunderSoundFunc(callPlayGanonBattleThunderSound)
 	game.SetPlayGanonDefeatFanfareFunc(callPlayGanonDefeatFanfare)
 	game.SetPlayStoryEvilLaughFunc(callPlayStoryEvilLaugh)
+	game.SetPlayEndingFanfareFunc(callPlayEndingFanfare)
 }
 
 // callPlayNote はGoからJavaScript側のplayNote(note, velocity)を呼び出す。
@@ -108,6 +109,13 @@ func callPlayGanonDefeatFanfare() {
 // (web/story.js、ストーリー画面のみで定義される)。
 func callPlayStoryEvilLaugh() {
 	js.Global().Call("playStoryEvilLaugh")
+}
+
+// callPlayEndingFanfare はGoからJavaScript側のplayEndingFanfare()を
+// 呼び出し、エンディング画面に入った瞬間のファンファーレを再生する
+// (web/ending.js、エンディング画面のみで定義される)。
+func callPlayEndingFanfare() {
+	js.Global().Call("playEndingFanfare")
 }
 
 // CallConsoleLog はGoからJavaScriptのconsole.logを呼び出す(Go→JSの実演)。
