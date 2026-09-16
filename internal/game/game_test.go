@@ -471,18 +471,37 @@ func TestOnPitchDetected_HighNoteDoesNotTriggerJump(t *testing.T) {
 }
 
 func TestOnMIDIEvent_NoteCTriggersTitleStart(t *testing.T) {
+	defer setSleepHookForTest(func(time.Duration) {})()
+
 	triggered := 0
-	SetTitleStartTrigger(func() { triggered++ })
+	done := make(chan struct{}, 2)
+	SetTitleStartTrigger(func() {
+		triggered++
+		done <- struct{}{}
+	})
 	defer SetTitleStartTrigger(nil)
 
 	OnMIDIEvent(midi.Event{Note: 60, Velocity: 100, IsNoteOn: true}) // C4
+	waitForTitleStartTrigger(t, done)
 	if triggered != 1 {
 		t.Fatalf("expected exactly one trigger for a C Note On, got %d", triggered)
 	}
 
 	OnMIDIEvent(midi.Event{Note: 72, Velocity: 100, IsNoteOn: true}) // C5(オクターブ違い)
+	waitForTitleStartTrigger(t, done)
 	if triggered != 2 {
 		t.Fatalf("expected the trigger to fire regardless of octave, got %d", triggered)
+	}
+}
+
+// waitForTitleStartTrigger は、playTitleStartAudioがgoroutineで非同期に
+// 呼び出すtitleStartTriggerの完了を待つ(タイムアウト付き)。
+func waitForTitleStartTrigger(t *testing.T, done chan struct{}) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("title start trigger was not called within timeout")
 	}
 }
 
@@ -509,14 +528,54 @@ func TestOnMIDIEvent_NoteOffDoesNotTriggerTitleStart(t *testing.T) {
 }
 
 func TestDebugTriggerTitleStart_CallsRegisteredTrigger(t *testing.T) {
+	defer setSleepHookForTest(func(time.Duration) {})()
+
+	triggered := 0
+	done := make(chan struct{}, 1)
+	SetTitleStartTrigger(func() {
+		triggered++
+		close(done)
+	})
+	defer SetTitleStartTrigger(nil)
+
+	DebugTriggerTitleStart()
+	waitForTitleStartTrigger(t, done)
+
+	if triggered != 1 {
+		t.Fatalf("expected the registered title start trigger to be called once, got %d", triggered)
+	}
+}
+
+func TestPlayTitleStartAudio_PlaysJingleThenTriggers(t *testing.T) {
+	defer setSleepHookForTest(func(time.Duration) {})()
+
+	var played, stopped []int
+	SetPlayNoteFunc(func(note, velocity int) { played = append(played, note) })
+	SetStopNoteFunc(func(note int) { stopped = append(stopped, note) })
+	defer func() { SetPlayNoteFunc(nil); SetStopNoteFunc(nil) }()
+
 	triggered := 0
 	SetTitleStartTrigger(func() { triggered++ })
 	defer SetTitleStartTrigger(nil)
 
-	DebugTriggerTitleStart()
+	playTitleStartAudio()
 
 	if triggered != 1 {
-		t.Fatalf("expected the registered title start trigger to be called once, got %d", triggered)
+		t.Fatalf("expected the title start trigger to be called once, got %d", triggered)
+	}
+	if len(played) != len(music.TitleStartJingle) {
+		t.Fatalf("played %d notes, want %d", len(played), len(music.TitleStartJingle))
+	}
+	for i, n := range music.TitleStartJingle {
+		if played[i] != n.MIDINote {
+			t.Errorf("played[%d] = %d, want %d", i, played[i], n.MIDINote)
+		}
+		if stopped[i] != n.MIDINote {
+			t.Errorf("stopped[%d] = %d, want %d", i, stopped[i], n.MIDINote)
+		}
+	}
+	if music.TitleStartJingle[0].MIDINote != music.TitleStartJingle[3].MIDINote-12 {
+		t.Fatalf("expected the first note to be exactly one octave below the last (same pitch class), got %d and %d", music.TitleStartJingle[0].MIDINote, music.TitleStartJingle[3].MIDINote)
 	}
 }
 

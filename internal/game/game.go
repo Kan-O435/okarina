@@ -301,10 +301,10 @@ func SetTitleStartTrigger(f func()) {
 
 // DebugTriggerTitleStart は、MIDIキーボード/オカリナ無しにキーボードから
 // 「ド(C)」を弾いたのと同じ効果を発生させるデバッグ用エントリーポイント
-// (web/title.jsのOキー)。
+// (web/title.js・web/story.jsのOキー)。
 func DebugTriggerTitleStart() {
 	if titleStartTrigger != nil {
-		titleStartTrigger()
+		go playTitleStartAudio()
 	}
 }
 
@@ -317,8 +317,26 @@ func OnMIDIEvent(e midi.Event) {
 	recorder.HandleEvent(e)
 
 	if e.IsNoteOn && titleStartTrigger != nil && music.PitchFromMIDINote(e.Note) == music.C {
-		titleStartTrigger()
+		go playTitleStartAudio()
 	}
+}
+
+// playTitleStartAudio は、タイトル画面・ストーリー画面で「ド」が弾かれた
+// 際に、次の画面へ遷移する前に短いジングル(music.TitleStartJingle、
+// ラ→レ→ミ→ラ)を鳴らす。最後の音を止めた直後に遷移すると余韻(フェード
+// アウト)が途中で切れて聞こえるため、music.TitleStartJingleReleaseTailの
+// 分だけ待ってから遷移する。再生用フックが未登録(ネイティブビルドや
+// JS未初期化時)の場合はジングルを鳴らさずに即座に遷移する。
+func playTitleStartAudio() {
+	audioHooksMu.Lock()
+	play, stop, sleep := playNoteHook, stopNoteHook, sleepHook
+	audioHooksMu.Unlock()
+
+	if play != nil && stop != nil {
+		playNotes(play, stop, sleep, music.TitleStartJingle)
+		sleep(music.TitleStartJingleReleaseTail)
+	}
+	titleStartTrigger()
 }
 
 // songOfTimePlayed は、時の歌(music.SongOfTimeName)が正しく演奏された
