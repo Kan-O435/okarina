@@ -109,6 +109,15 @@ if (!WebAssembly) {
         requestAnimationFrame(updateMelodyHintVisibility);
       }
       requestAnimationFrame(updateMelodyHintVisibility);
+
+      // 馬に乗った後は、ジャンプの仕方(低い音を鳴らす)を教えるヒントに
+      // 切り替える(game.SetJumpHintVisibleFuncで登録された条件)。
+      const jumpHintEl = document.getElementById('grassland-jump-hint');
+      function updateJumpHintVisibility() {
+        jumpHintEl.hidden = !(window.goJumpHintVisible && window.goJumpHintVisible());
+        requestAnimationFrame(updateJumpHintVisibility);
+      }
+      requestAnimationFrame(updateJumpHintVisibility);
     })
     .catch((err) => {
       console.error("WASMのロードに失敗しました:", err);

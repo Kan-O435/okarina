@@ -278,6 +278,28 @@ func MelodyHUDVisible() bool {
 	return melodyHUDVisible()
 }
 
+// jumpHintVisible は、草原フィールドで「低い音を鳴らしてジャンプ!」の
+// ヒントテキスト(web/grassland.jsのgoJumpHintVisible経由)を表示すべき
+// かどうかを返す関数。cmd/grassland/main.goが起動時に登録する
+// (melodyHUDVisibleと同様のコールバックパターン)。
+var jumpHintVisible func() bool
+
+// SetJumpHintVisibleFunc は、ジャンプのヒントテキストの表示条件を返す
+// 関数を登録する。
+func SetJumpHintVisibleFunc(f func() bool) {
+	jumpHintVisible = f
+}
+
+// JumpHintVisible はブリッジ(JavaScript側)から毎フレームポーリングされ、
+// 登録済みのジャンプヒント表示条件を評価する。未登録の場合(草原
+// フィールド以外のページ)はfalseを返す。
+func JumpHintVisible() bool {
+	if jumpHintVisible == nil {
+		return false
+	}
+	return jumpHintVisible()
+}
+
 // OnPitchDetected はマイクから検出された最新のピッチ(Hz)をプレイヤーの
 // 移動方向判定に渡す。ピッチが検出できなかった場合はfreqに0以下を渡す。
 // 実際のプレイヤー移動は、Go側で常時回っているゲームループ

@@ -160,10 +160,11 @@ h3:first-of-type {
   pointer-events: none;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
 }
-/* melody-hint: 楽譜HUD(WebGL側)の下に添える「〜せよ!」の指示テキスト。
-   楽譜HUD本体と同じタイミング(game.SetMelodyHUDVisibleFunc)で
-   表示・非表示を切り替える(各web/*.js参照)。 */
-.melody-hint {
+/* field-hint: 各フィールドのcanvas上に添える指示テキスト共通のスタイル
+   (楽譜HUDの下の「〜せよ!」、草原フィールドのジャンプの仕方など)。
+   表示・非表示はGo側の対応する条件(game.SetMelodyHUDVisibleFunc・
+   game.SetJumpHintVisibleFunc)に合わせて各web/*.jsが切り替える。 */
+.field-hint {
   position: absolute;
   top: 185px;
   left: 50%;
