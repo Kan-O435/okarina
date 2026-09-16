@@ -27,7 +27,8 @@ func Init() {
 	js.Global().Set("goDebugTriggerJump", js.FuncOf(goDebugTriggerJump))
 	js.Global().Set("goDebugTriggerGanonHallMelody", js.FuncOf(goDebugTriggerGanonHallMelody))
 	js.Global().Set("goDefeatGanonFinalForm", js.FuncOf(goDefeatGanonFinalForm))
-	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody, goDefeatGanonFinalForm)")
+	js.Global().Set("goMelodyHUDVisible", js.FuncOf(goMelodyHUDVisible))
+	CallConsoleLog("bridge: Go functions registered (goPing, goOnMIDIEvent, goOpenDoor, goOnPitchDetected, goGetPlayerDirection, goSetDebugDirection, goDefeatGanonFirstForm, goPreviewGanonHallCollapse, goSummonHorse, goDebugTriggerTitleStart, goDebugTriggerJump, goDebugTriggerGanonHallMelody, goDefeatGanonFinalForm, goMelodyHUDVisible)")
 
 	// JS側(web/audio.jsのplayNote/stopNote/playConfirmationFanfare、
 	// web/grassland.jsのplayHorseJumpSound、web/ganon-hall.jsの
@@ -149,6 +150,15 @@ func goOnPitchDetected(this js.Value, args []js.Value) interface{} {
 // ("forward" | "backward" | "idle")。UI表示等に使う。
 func goGetPlayerDirection(this js.Value, args []js.Value) interface{} {
 	return game.PlayerDirection()
+}
+
+// goMelodyHUDVisible は、現在のフィールドの楽譜HUD(WebGL側)が表示中
+// かどうかをJS側に返す。各web/*.jsが、楽譜HUDに添えたヒントテキストの
+// 表示・非表示を、HUD本体と全く同じタイミングで切り替えるために毎フレーム
+// ポーリングする。楽譜HUDが無いページ(cmd/*/main.goでgame.
+// SetMelodyHUDVisibleFuncが未登録)ではfalseを返す。
+func goMelodyHUDVisible(this js.Value, args []js.Value) interface{} {
+	return game.MelodyHUDVisible()
 }
 
 // goSetDebugDirection はJavaScript側(デバッグ用の矢印キー操作)から、

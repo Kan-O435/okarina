@@ -181,6 +181,7 @@ func main() {
 			// goPreviewGanonHallCollapse経由で呼ばれる。ページ遷移はせず、
 			// その場で演出が終わるところまで見せる。
 			game.SetGanonHallCollapsePreviewTrigger(func() { startSmoke(true) })
+			game.SetMelodyHUDVisibleFunc(func() bool { return !game.GanonHallMelodyPlayed() })
 
 			ctx.RunLoop(func(dt float64) {
 				switch phase {

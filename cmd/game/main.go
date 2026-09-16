@@ -43,6 +43,7 @@ func main() {
 				if err != nil {
 					fmt.Println("renderer: failed to build song sheet HUD:", err)
 				}
+				game.SetMelodyHUDVisibleFunc(func() bool { return songHUD != nil && game.IsNearDoor() })
 
 				ctx.RunLoop(func(dt float64) {
 					g.Update(dt)

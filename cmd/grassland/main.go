@@ -103,6 +103,10 @@ func main() {
 				if err != nil {
 					fmt.Println("renderer: failed to build horse song sheet HUD:", err)
 				}
+				game.SetMelodyHUDVisibleFunc(func() bool {
+					return horseSongHUD != nil && !game.HorseSongPlayed() &&
+						math.Abs(player.Player.Z-grasslandFirstObstacleCenterZ) <= grasslandSongSheetRangeZ
+				})
 
 				ctx.RunLoop(func(dt float64) {
 					prevZ := player.Player.Z

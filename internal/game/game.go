@@ -255,6 +255,29 @@ func IsNearDoor() bool {
 	return instance.IsNearDoor()
 }
 
+// melodyHUDVisible は、現在のフィールドで楽譜HUD(および楽譜に添える
+// 「〜せよ!」テキスト、web/*.jsのgoMelodyHUDVisible経由)を表示すべき
+// かどうかを返す関数。各cmd/*/main.goが、そのフィールドの楽譜HUDと
+// 全く同じ表示条件(近づいたら表示・演奏済みなら非表示、など)を渡して
+// 起動時に登録する(horseSummoner等と同様のコールバックパターン)。
+var melodyHUDVisible func() bool
+
+// SetMelodyHUDVisibleFunc は、現在のフィールドの楽譜HUD表示条件を返す
+// 関数を登録する。
+func SetMelodyHUDVisibleFunc(f func() bool) {
+	melodyHUDVisible = f
+}
+
+// MelodyHUDVisible はブリッジ(JavaScript側)から毎フレームポーリングされ、
+// 登録済みの楽譜HUD表示条件を評価する。未登録の場合(楽譜HUDが無い
+// ページ)はfalseを返す。
+func MelodyHUDVisible() bool {
+	if melodyHUDVisible == nil {
+		return false
+	}
+	return melodyHUDVisible()
+}
+
 // OnPitchDetected はマイクから検出された最新のピッチ(Hz)をプレイヤーの
 // 移動方向判定に渡す。ピッチが検出できなかった場合はfreqに0以下を渡す。
 // 実際のプレイヤー移動は、Go側で常時回っているゲームループ
